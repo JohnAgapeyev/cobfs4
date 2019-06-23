@@ -3,11 +3,7 @@
 
 #include "cobfs4.h"
 
-void foo(void) {
-    printf("Hello world\n");
-}
-
 int main(void) {
-    foo();
+    test_elligator();
     return EXIT_SUCCESS;
 }
