@@ -9,6 +9,7 @@ extern "C" {
 #include <string.h>
 #include <sodium.h>
 #include <openssl/evp.h>
+#include <openssl/ec.h>
 
 #if 0
 void elligator2(unsigned char in_point[crypto_core_ed25519_BYTES],
@@ -76,16 +77,30 @@ void test_elligator(void) {
     size_t skeylen;
     unsigned char *skey;
     unsigned char *skey2;
+    unsigned char *skey3;
 
     EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_X25519, NULL);
+
+    BIGNUM *bnp;
+    BN_CTX *bnctx;
+    size_t i;
+
+    bnp = BN_new();
+    bnctx = BN_CTX_new();
 
     pkey = EVP_PKEY_new();
     peerkey = EVP_PKEY_new();
 
     EVP_PKEY_keygen_init(pctx);
     EVP_PKEY_keygen(pctx, &pkey);
-    EVP_PKEY_keygen(pctx, &peerkey);
     EVP_PKEY_CTX_free(pctx);
+
+    skey3 = OPENSSL_malloc(1024);
+
+    EVP_PKEY_get_raw_public_key(pkey, skey3, &skeylen);
+    BN_bin2bn(skey3, skeylen, bnp);
+    BN_bn2bin(bnp, skey3);
+    peerkey = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519, NULL, skey3, skeylen);
 
     ctx = EVP_PKEY_CTX_new(pkey, NULL);
     EVP_PKEY_derive_init(ctx);
@@ -97,18 +112,10 @@ void test_elligator(void) {
 
     EVP_PKEY_derive(ctx, skey, &skeylen);
 
-    ctx = EVP_PKEY_CTX_new(peerkey, NULL);
-    EVP_PKEY_derive_init(ctx);
-    EVP_PKEY_derive_set_peer(ctx, pkey);
-    EVP_PKEY_derive(ctx, NULL, &skeylen);
-    skey2 = OPENSSL_malloc(skeylen);
-    EVP_PKEY_derive(ctx, skey2, &skeylen);
-
-    if (memcmp(skey, skey2, skeylen) == 0) {
-        printf("Keys match\n");
-    } else {
-        printf("Keys DON'T match\n");
+    for (i = 0; i < skeylen; ++i) {
+        printf("%02x", skey[i]);
     }
+    printf("\n");
 
 }
 #endif
