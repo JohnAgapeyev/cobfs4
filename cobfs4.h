@@ -8,7 +8,9 @@ extern "C" {
 #include <stdlib.h>
 #include <string.h>
 #include <sodium.h>
+#include <openssl/evp.h>
 
+#if 0
 void elligator2(unsigned char in_point[crypto_core_ed25519_BYTES],
         unsigned char out_point[crypto_core_ed25519_UNIFORMBYTES]) {
     const unsigned int A = 486662;
@@ -67,6 +69,49 @@ void test_elligator(void) {
         fprintf(stdout, "Mapping was able to invert correctly\n");
     }
 }
+#else
+void test_elligator(void) {
+    EVP_PKEY_CTX *ctx;
+    EVP_PKEY *pkey, *peerkey;
+    size_t skeylen;
+    unsigned char *skey;
+    unsigned char *skey2;
+
+    EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_X25519, NULL);
+
+    pkey = EVP_PKEY_new();
+    peerkey = EVP_PKEY_new();
+
+    EVP_PKEY_keygen_init(pctx);
+    EVP_PKEY_keygen(pctx, &pkey);
+    EVP_PKEY_keygen(pctx, &peerkey);
+    EVP_PKEY_CTX_free(pctx);
+
+    ctx = EVP_PKEY_CTX_new(pkey, NULL);
+    EVP_PKEY_derive_init(ctx);
+    EVP_PKEY_derive_set_peer(ctx, peerkey);
+
+    EVP_PKEY_derive(ctx, NULL, &skeylen);
+
+    skey = OPENSSL_malloc(skeylen);
+
+    EVP_PKEY_derive(ctx, skey, &skeylen);
+
+    ctx = EVP_PKEY_CTX_new(peerkey, NULL);
+    EVP_PKEY_derive_init(ctx);
+    EVP_PKEY_derive_set_peer(ctx, pkey);
+    EVP_PKEY_derive(ctx, NULL, &skeylen);
+    skey2 = OPENSSL_malloc(skeylen);
+    EVP_PKEY_derive(ctx, skey2, &skeylen);
+
+    if (memcmp(skey, skey2, skeylen) == 0) {
+        printf("Keys match\n");
+    } else {
+        printf("Keys DON'T match\n");
+    }
+
+}
+#endif
 
 #if defined(__cplusplus)
 }
