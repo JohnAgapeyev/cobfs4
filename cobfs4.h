@@ -9,7 +9,7 @@ extern "C" {
 #include <string.h>
 #include <sodium.h>
 #include <openssl/evp.h>
-#include <openssl/ec.h>
+#include <openssl/bn.h>
 
 #if 0
 void elligator2(unsigned char in_point[crypto_core_ed25519_BYTES],
@@ -71,6 +71,82 @@ void test_elligator(void) {
     }
 }
 #else
+
+unsigned char *elligator2(EVP_PKEY *pkey) {
+    EVP_PKEY_CTX *ctx;
+    BIGNUM *r;
+    BIGNUM *A;
+    BIGNUM *p;
+    BIGNUM *tmp;
+    BIGNUM *u1;
+    BIGNUM *u2;
+    BIGNUM *w1;
+    BIGNUM *n;
+    BN_CTX *bnctx;
+    unsigned char *skey;
+    size_t skeylen;
+    size_t i;
+
+    EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_X25519, NULL);
+
+    r = BN_new();
+    A = BN_new();
+    p = BN_new();
+    u1 = BN_new();
+    u2 = BN_new();
+    w1 = BN_new();
+    n = BN_new();
+    tmp = BN_new();
+    bnctx = BN_CTX_new();
+
+    BN_set_word(A, 486662);
+    BN_set_word(n, 2);
+
+    /* p = (2**255)-19 */
+    BN_set_word(p, 2);
+    BN_set_word(tmp, 255);
+    BN_exp(p, p, tmp, bnctx);
+    BN_set_word(tmp, 19);
+    BN_sub(p, p, tmp);
+
+    EVP_PKEY_get_raw_public_key(pkey, NULL, &skeylen);
+
+    skey = OPENSSL_malloc(skeylen);
+
+    EVP_PKEY_get_raw_public_key(pkey, skey, &skeylen);
+
+    BN_bin2bn(skey, skeylen, r);
+
+    /*
+     * Do all the math here
+    elligator2(r):
+        u1 = -A * inv(1 + nr**2) (mod p)
+        w1 = u1(u1**2 + Au1 + 1) (mod p)
+        if w1**((p-1)/2) == -1 (mod p):
+            u2 = -A - u1 (mod p)
+            return u2
+        return u1
+    */
+
+    /* u1 = -A * inv(1 + nr**2) (mod p) */
+    BN_copy(u1, r);
+    BN_mod_sqr(u1, r, p, bnctx);
+    BN_mod_mul(u1, u1, n, p, bnctx);
+    BN_mod_add(u1, u1, BN_value_one(), p, bnctx);
+    BN_mod_inverse(u1, u1, p, bnctx);
+    BN_mod_mul(u1, u1, A, p, bnctx);
+
+    BN_bn2bin(r, skey);
+
+    EVP_PKEY_CTX_free(pctx);
+
+    return skey;
+}
+
+EVP_PKEY *elligator2_inv(unsigned char *buffer) {
+    return NULL;
+}
+
 void test_elligator(void) {
     EVP_PKEY_CTX *ctx;
     EVP_PKEY *pkey, *peerkey;
