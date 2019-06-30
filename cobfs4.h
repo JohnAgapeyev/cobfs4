@@ -119,22 +119,34 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
 
     /*
      * Do all the math here
-    elligator2(r):
-        u1 = -A * inv(1 + nr**2) (mod p)
-        w1 = u1(u1**2 + Au1 + 1) (mod p)
-        if w1**((p-1)/2) == -1 (mod p):
-            u2 = -A - u1 (mod p)
-            return u2
-        return u1
+     * x is the public key input
+     * A is 486662
+     * B is 1
+     * p is (2**255)-19
+     * u is 2
+     * Preconditions:
+     *  - x != -A
+     *  - (-ux(x + A))**((p-1)/2) == 1
+     *
+     * Calculate y from curve equation:
+     * y**2 = x**3 + Ax**2 + x
+     *
+     * Output is r
+     * if y <= (p-1)/2
+     *  - r = sqrt((-1/2)(u/u+A))
+     * else
+     *  - r = sqrt((-1/2)((u+A)/u))
     */
 
-    /* u1 = -A * inv(1 + nr**2) (mod p) */
+    /*
+     u1 = -A * inv(1 + nr**2) (mod p)
     BN_copy(u1, r);
     BN_mod_sqr(u1, r, p, bnctx);
     BN_mod_mul(u1, u1, n, p, bnctx);
     BN_mod_add(u1, u1, BN_value_one(), p, bnctx);
     BN_mod_inverse(u1, u1, p, bnctx);
     BN_mod_mul(u1, u1, A, p, bnctx);
+    */
 
     BN_bn2bin(r, skey);
 
@@ -144,6 +156,23 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
 }
 
 EVP_PKEY *elligator2_inv(unsigned char *buffer) {
+    /*
+     * Do all the math here
+     * r is the raw buffer input
+     * A is 486662
+     * B is 1
+     * p is (2**255)-19
+     * u is 2
+     * Preconditions:
+     *  - 1 + ur**2 != 0
+     *  - (A**2)u(r**2) != B((1 + ur**2)**2)
+     *
+     * Output is x (y can also be calculated, but is not necessary)
+     * v = -A/(1+ur**2)
+     * e = (v**3+Av**2+Bv)**((p-1)/2)
+     * x = ev-(1-e)A/2
+     * y = -e*sqrt(x**3+Ax**2+Bx)
+    */
     return NULL;
 }
 
