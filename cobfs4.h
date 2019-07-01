@@ -73,41 +73,43 @@ void test_elligator(void) {
 #else
 
 unsigned char *elligator2(EVP_PKEY *pkey) {
-    EVP_PKEY_CTX *ctx;
     BIGNUM *r;
-    BIGNUM *A;
+    BIGNUM *x;
+    BIGNUM *y;
+    unsigned long A;
+    unsigned long B;
+    unsigned long u;
     BIGNUM *p;
     BIGNUM *tmp;
-    BIGNUM *u1;
-    BIGNUM *u2;
-    BIGNUM *w1;
-    BIGNUM *n;
+    BIGNUM *tmp2;
+    BIGNUM *neg_one;
     BN_CTX *bnctx;
     unsigned char *skey;
     size_t skeylen;
     size_t i;
+    EVP_PKEY_CTX *pctx;
 
-    EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_X25519, NULL);
+    A = 486662;
+    u = 2;
 
-    r = BN_new();
-    A = BN_new();
+    pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_X25519, NULL);
+
+    x = BN_new();
+    y = BN_new();
     p = BN_new();
-    u1 = BN_new();
-    u2 = BN_new();
-    w1 = BN_new();
-    n = BN_new();
+    neg_one = BN_new();
     tmp = BN_new();
+    tmp2 = BN_new();
     bnctx = BN_CTX_new();
-
-    BN_set_word(A, 486662);
-    BN_set_word(n, 2);
 
     /* p = (2**255)-19 */
     BN_set_word(p, 2);
     BN_set_word(tmp, 255);
     BN_exp(p, p, tmp, bnctx);
-    BN_set_word(tmp, 19);
-    BN_sub(p, p, tmp);
+    BN_sub_word(p, 19);
+
+    BN_zero(neg_one);
+    BN_sub_word(neg_one, 1);
 
     EVP_PKEY_get_raw_public_key(pkey, NULL, &skeylen);
 
@@ -115,7 +117,7 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
 
     EVP_PKEY_get_raw_public_key(pkey, skey, &skeylen);
 
-    BN_bin2bn(skey, skeylen, r);
+    BN_bin2bn(skey, skeylen, x);
 
     /*
      * Do all the math here
@@ -138,15 +140,61 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
      *  - r = sqrt((-1/2)((u+A)/u))
     */
 
-    /*
-     u1 = -A * inv(1 + nr**2) (mod p)
-    BN_copy(u1, r);
-    BN_mod_sqr(u1, r, p, bnctx);
-    BN_mod_mul(u1, u1, n, p, bnctx);
-    BN_mod_add(u1, u1, BN_value_one(), p, bnctx);
-    BN_mod_inverse(u1, u1, p, bnctx);
-    BN_mod_mul(u1, u1, A, p, bnctx);
-    */
+    BN_set_word(tmp, A);
+    BN_mul(tmp, tmp, neg_one, bnctx);
+
+    /* Check if x == -A */
+    if (BN_cmp(x, tmp) == 0) {
+        /* Precondition failed */
+        return NULL;
+    }
+
+    /* tmp = -u*x*(x+A) */
+    BN_set_word(tmp, A);
+    BN_add(tmp, x, tmp);
+    BN_mod_mul(tmp, tmp, x, p, bnctx);
+    BN_mul_word(tmp, u);
+    BN_mod_mul(tmp, tmp, neg_one, p, bnctx);
+
+    /* tmp2 = (p-1)/2 */
+    BN_copy(tmp2, p);
+    BN_sub(tmp2, tmp2, BN_value_one());
+    BN_rshift1(tmp2, tmp2);
+
+    /* (-ux(x + A))**((p-1)/2) */
+    BN_mod_exp(tmp, tmp, tmp2, p, bnctx);
+
+    if (!BN_is_one(tmp)) {
+        /* Precondition failed */
+        return NULL;
+    }
+
+    /* y = y**2 = x**3 + Ax**2 + x */
+    BN_mod_sqr(tmp, x, p, bnctx);
+    BN_mod_mul(tmp, tmp, x, p, bnctx);
+    BN_mod_add(tmp, tmp, x, p, bnctx);
+    BN_mod_sqr(y, x, p, bnctx);
+    BN_mul_word(y, A);
+    BN_mod_add(y, y, tmp, p, bnctx);
+
+    /* tmp = (p-3)/8 */
+    BN_copy(tmp, p);
+    BN_sub_word(tmp, 3);
+    BN_rshift(tmp, tmp, 3);
+
+    /* y = sqrt(y**2)*/
+    BN_mod_exp(y, y, tmp, p, bnctx);
+
+    /* tmp = (p-1)/2 */
+    BN_copy(tmp, p);
+    BN_sub_word(tmp, 1);
+    BN_rshift1(tmp, tmp);
+
+    if (BN_cmp(y, tmp) == 1) {
+        /* y is NOT element of sqrt(Fq) */
+    } else {
+        /* y is element of sqrt(Fq) */
+    }
 
     BN_bn2bin(r, skey);
 
