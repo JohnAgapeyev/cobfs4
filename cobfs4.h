@@ -77,7 +77,6 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     BIGNUM *x;
     BIGNUM *y;
     unsigned long A;
-    unsigned long B;
     unsigned long u;
     BIGNUM *p;
     BIGNUM *tmp;
@@ -86,7 +85,6 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     BN_CTX *bnctx;
     unsigned char *skey;
     size_t skeylen;
-    size_t i;
     EVP_PKEY_CTX *pctx;
 
     A = 486662;
@@ -97,6 +95,7 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     x = BN_new();
     y = BN_new();
     p = BN_new();
+    r = BN_new();
     neg_one = BN_new();
     tmp = BN_new();
     tmp2 = BN_new();
@@ -135,9 +134,9 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
      *
      * Output is r
      * if y <= (p-1)/2
-     *  - r = sqrt((-1/2)(u/u+A))
+     *  - r = sqrt(-x/((x+A)u))
      * else
-     *  - r = sqrt((-1/2)((u+A)/u))
+     *  - r = sqrt(-(x+A)/(ux))
     */
 
     BN_set_word(tmp, A);
@@ -190,10 +189,44 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     BN_sub_word(tmp, 1);
     BN_rshift1(tmp, tmp);
 
+    /*
+     * Output is r
+     * if y <= (p-1)/2
+     *  - r = sqrt(-x/((x+A)u))
+     * else
+     *  - r = sqrt(-(x+A)/(ux))
+     */
     if (BN_cmp(y, tmp) == 1) {
         /* y is NOT element of sqrt(Fq) */
+        BN_copy(r, x);
+        BN_add_word(r, A);
+        BN_mul(r, r, neg_one, bnctx);
+
+        BN_copy(tmp, x);
+        BN_mul_word(tmp, u);
+
+        BN_div(r, NULL, r, tmp, bnctx);
+
+        /* tmp = (q-3)/8 */
+        BN_copy(tmp, p);
+        BN_sub_word(tmp, 3);
+        BN_rshift(tmp, tmp, 3);
+
+        BN_mod_exp(r, r, tmp, p, bnctx);
     } else {
         /* y is element of sqrt(Fq) */
+        BN_copy(r, x);
+        BN_add_word(r, A);
+        BN_mul_word(r, u);
+        BN_mul(tmp, x, neg_one, bnctx);
+        BN_div(r, NULL, r, tmp, bnctx);
+
+        /* tmp = (q-3)/8 */
+        BN_copy(tmp, p);
+        BN_sub_word(tmp, 3);
+        BN_rshift(tmp, tmp, 3);
+
+        BN_mod_exp(r, r, tmp, p, bnctx);
     }
 
     BN_bn2bin(r, skey);
@@ -248,6 +281,17 @@ void test_elligator(void) {
     EVP_PKEY_keygen(pctx, &pkey);
     EVP_PKEY_CTX_free(pctx);
 
+    skey3 = elligator2(pkey);
+
+    if (skey3) {
+        for (i = 0; i < 32; ++i) {
+            printf("%02x", skey3[i]);
+        }
+        printf("\n");
+    } else {
+        printf("Generated key was not valid for elligator2\n");
+    }
+
     skey3 = OPENSSL_malloc(1024);
 
     EVP_PKEY_get_raw_public_key(pkey, skey3, &skeylen);
@@ -265,10 +309,12 @@ void test_elligator(void) {
 
     EVP_PKEY_derive(ctx, skey, &skeylen);
 
+#if 0
     for (i = 0; i < skeylen; ++i) {
         printf("%02x", skey[i]);
     }
     printf("\n");
+#endif
 
 }
 #endif
