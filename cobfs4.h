@@ -56,6 +56,8 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
 
     BN_bin2bn(skey, skeylen, x);
 
+    BN_dec2bn(&x, "23454241202980220908205961704612506742290734245304826209886987946658985645899");
+
     /*
      * Do all the math here
      * x is the public key input
@@ -114,13 +116,9 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     BN_mul_word(y, A);
     BN_mod_add(y, y, tmp, p, bnctx);
 
-    /* tmp = (p-3)/8 */
-    BN_copy(tmp, p);
-    BN_sub_word(tmp, 3);
-    BN_rshift(tmp, tmp, 3);
-
     /* y = sqrt(y**2)*/
-    BN_mod_exp(y, y, tmp, p, bnctx);
+    BN_mod_sqrt(y, y, p, bnctx);
+    BN_mod_mul(y, y, neg_one, p, bnctx);
 
     /* tmp = (p-1)/2 */
     BN_copy(tmp, p);
@@ -135,6 +133,7 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
      *  - r = sqrt(-(x+A)/(ux))
      */
     if (BN_cmp(y, tmp) == 1) {
+        printf("Not element\n");
         /* y is NOT element of sqrt(Fq) */
         BN_copy(r, x);
         BN_add_word(r, A);
@@ -143,34 +142,28 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
         BN_copy(tmp, x);
         BN_mul_word(tmp, u);
 
-        /* BN_div(r, NULL, r, tmp, bnctx); */
         BN_mod_inverse(tmp, tmp, p, bnctx);
         BN_mod_mul(r, r, tmp, p, bnctx);
 
-        /* tmp = (q-3)/8 */
-        BN_copy(tmp, p);
-        BN_sub_word(tmp, 3);
-        BN_rshift(tmp, tmp, 3);
-
-        BN_mod_exp(r, r, tmp, p, bnctx);
+        BN_mod_sqrt(r, r, p, bnctx);
+        BN_mod_mul(r, r, neg_one, p, bnctx);
     } else {
+        printf("Is element\n");
         /* y is element of sqrt(Fq) */
         BN_copy(r, x);
         BN_add_word(r, A);
         BN_mul_word(r, u);
         BN_mul(tmp, x, neg_one, bnctx);
 
-        /* BN_div(r, NULL, r, tmp, bnctx); */
         BN_mod_inverse(tmp, tmp, p, bnctx);
         BN_mod_mul(r, r, tmp, p, bnctx);
 
-        /* tmp = (q-3)/8 */
-        BN_copy(tmp, p);
-        BN_sub_word(tmp, 3);
-        BN_rshift(tmp, tmp, 3);
-
-        BN_mod_exp(r, r, tmp, p, bnctx);
+        BN_mod_sqrt(r, r, p, bnctx);
+        BN_mod_mul(r, r, neg_one, p, bnctx);
     }
+    printf("Map x \n%s\n", BN_bn2dec(x));
+    printf("Map y \n%s\n", BN_bn2dec(y));
+    printf("Map r \n%s\n", BN_bn2dec(r));
 
     BN_bn2bin(r, skey);
 
