@@ -56,8 +56,8 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
 
     BN_bin2bn(skey, skeylen, x);
 
-    BN_dec2bn(&x, "23454241202980220908205961704612506742290734245304826209886987946658985645899");
-    BN_dec2bn(&x, "56734195017185880291527346948098815585360359419103566189176114437352872486756");
+    /* BN_dec2bn(&x, "23454241202980220908205961704612506742290734245304826209886987946658985645899"); */
+    /* BN_dec2bn(&x, "56734195017185880291527346948098815585360359419103566189176114437352872486756"); */
 
     /*
      * Do all the math here
@@ -159,8 +159,6 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
         BN_mod_inverse(r, r, p, bnctx);
         BN_mod_mul(r, r, tmp, p, bnctx);
 
-        printf("Pre sqrt r \n%s\n", BN_bn2dec(r));
-
         BN_mod_sqrt(r, r, p, bnctx);
         BN_mod_mul(r, r, neg_one, p, bnctx);
     }
@@ -173,6 +171,8 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     EVP_PKEY_CTX_free(pctx);
 
     return skey;
+        BN_mod_sqrt(r, r, p, bnctx);
+        BN_mod_mul(r, r, neg_one, p, bnctx);
 }
 
 EVP_PKEY *elligator2_inv(unsigned char *buffer, size_t len) {
@@ -305,11 +305,15 @@ EVP_PKEY *elligator2_inv(unsigned char *buffer, size_t len) {
     BN_mul_word(tmp, A);
     BN_mod_add(y, y, tmp, p, bnctx);
 
-    BN_copy(tmp, p);
-    BN_sub_word(tmp, 3);
-    BN_rshift(tmp, tmp, 3);
+    /* BN_copy(tmp, p); */
+    /* BN_sub_word(tmp, 3); */
+    /* BN_rshift(tmp, tmp, 3); */
 
-    BN_mod_exp(y, y, tmp, p, bnctx);
+    BN_mod_sqrt(y, y, p, bnctx);
+    BN_mod_mul(y, y, neg_one, p, bnctx);
+
+    /* BN_mod_exp(y, y, tmp, p, bnctx); */
+
     BN_mod_mul(y, y, e, p, bnctx);
     BN_mod_mul(y, y, neg_one, p, bnctx);
 
@@ -319,10 +323,9 @@ EVP_PKEY *elligator2_inv(unsigned char *buffer, size_t len) {
 
     BN_bn2bin(x, skey);
 
-    BN_print_fp(stdout, x);
-    printf("\n");
-    BN_print_fp(stdout, y);
-    printf("\n");
+    printf("Inverse r \n%s\n", BN_bn2dec(r));
+    printf("Inverse x \n%s\n", BN_bn2dec(x));
+    printf("Inverse y \n%s\n", BN_bn2dec(y));
 
 #if 0
     for (i = 0; i < 32; ++i) {
