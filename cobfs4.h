@@ -55,9 +55,15 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     EVP_PKEY_get_raw_public_key(pkey, skey, &skeylen);
 
     BN_bin2bn(skey, skeylen, x);
+    printf("Map pre mod x \n%s\n", BN_bn2dec(x));
+    BN_mod(x, x, p, bnctx);
+    printf("Map post mod x \n%s\n", BN_bn2dec(x));
 
     /* BN_dec2bn(&x, "23454241202980220908205961704612506742290734245304826209886987946658985645899"); */
-     BN_dec2bn(&x, "56734195017185880291527346948098815585360359419103566189176114437352872486756");
+    /* BN_dec2bn(&x, "36374335545667982257306059036255426864696276801784234118212621826337100597489"); */
+    /* BN_dec2bn(&x, "46361153250382670033219511755803478329607887341189111865347676255904599012937"); */
+    /* BN_dec2bn(&x, "38639291277585702452117027365758672231807046583527127817757812123002384585246"); */
+    /* BN_dec2bn(&x, "56734195017185880291527346948098815585360359419103566189176114437352872486756"); */
 
     /*
      * Do all the math here
@@ -120,6 +126,15 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     /* y = sqrt(y**2)*/
     BN_mod_sqrt(y, y, p, bnctx);
     BN_mod_mul(y, y, neg_one, p, bnctx);
+
+    printf("Map pre mod x \n%s\n", BN_bn2dec(y));
+    BN_mod(y, y, p, bnctx);
+    printf("Map post mod x \n%s\n", BN_bn2dec(y));
+
+    if (BN_is_zero(y)) {
+        /* Precondition failed */
+        return NULL;
+    }
 
     /* tmp = (p-1)/2 */
     BN_copy(tmp, p);
@@ -318,6 +333,8 @@ EVP_PKEY *elligator2_inv(unsigned char *buffer, size_t len) {
     BN_bn2bin(x, skey);
 
     printf("Inverse r \n%s\n", BN_bn2dec(r));
+    printf("Inverse v \n%s\n", BN_bn2dec(v));
+    printf("Inverse e \n%s\n", BN_bn2dec(e));
     printf("Inverse x \n%s\n", BN_bn2dec(x));
     printf("Inverse y \n%s\n", BN_bn2dec(y));
 
