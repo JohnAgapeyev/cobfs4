@@ -57,6 +57,7 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     BN_bin2bn(skey, skeylen, x);
 
     BN_dec2bn(&x, "23454241202980220908205961704612506742290734245304826209886987946658985645899");
+    BN_dec2bn(&x, "56734195017185880291527346948098815585360359419103566189176114437352872486756");
 
     /*
      * Do all the math here
@@ -155,8 +156,10 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
         BN_mul_word(r, u);
         BN_mul(tmp, x, neg_one, bnctx);
 
-        BN_mod_inverse(tmp, tmp, p, bnctx);
+        BN_mod_inverse(r, r, p, bnctx);
         BN_mod_mul(r, r, tmp, p, bnctx);
+
+        printf("Pre sqrt r \n%s\n", BN_bn2dec(r));
 
         BN_mod_sqrt(r, r, p, bnctx);
         BN_mod_mul(r, r, neg_one, p, bnctx);
