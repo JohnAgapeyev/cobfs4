@@ -57,7 +57,7 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     BN_bin2bn(skey, skeylen, x);
 
     /* BN_dec2bn(&x, "23454241202980220908205961704612506742290734245304826209886987946658985645899"); */
-    /* BN_dec2bn(&x, "56734195017185880291527346948098815585360359419103566189176114437352872486756"); */
+     BN_dec2bn(&x, "56734195017185880291527346948098815585360359419103566189176114437352872486756");
 
     /*
      * Do all the math here
@@ -305,17 +305,11 @@ EVP_PKEY *elligator2_inv(unsigned char *buffer, size_t len) {
     BN_mul_word(tmp, A);
     BN_mod_add(y, y, tmp, p, bnctx);
 
-    /* BN_copy(tmp, p); */
-    /* BN_sub_word(tmp, 3); */
-    /* BN_rshift(tmp, tmp, 3); */
-
     BN_mod_sqrt(y, y, p, bnctx);
     BN_mod_mul(y, y, neg_one, p, bnctx);
 
-    /* BN_mod_exp(y, y, tmp, p, bnctx); */
-
-    BN_mod_mul(y, y, e, p, bnctx);
-    BN_mod_mul(y, y, neg_one, p, bnctx);
+    /* BN_mod_mul(y, y, e, p, bnctx); */
+    /* BN_mod_mul(y, y, neg_one, p, bnctx); */
 
 
     skeylen = BN_num_bytes(x);
