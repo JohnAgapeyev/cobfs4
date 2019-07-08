@@ -36,6 +36,8 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     unsigned char *skey;
     size_t skeylen;
     EVP_PKEY_CTX *pctx;
+    unsigned char tc;
+    int i;
 
     A = 486662;
     u = 2;
@@ -69,6 +71,12 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     skey = OPENSSL_malloc(skeylen);
 
     EVP_PKEY_get_raw_public_key(pkey, skey, &skeylen);
+
+    for (i = 0; i < skeylen / 2 ; ++i) {
+        tc = skey[i];
+        skey[i] = skey[skeylen - i - 1];
+        skey[skeylen - i - 1] = tc;
+    }
 
     BN_bin2bn(skey, skeylen, x);
     BN_mod(x, x, p, bnctx);
@@ -151,6 +159,17 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     BN_mod_sqr(y, x, p, bnctx);
     BN_mul_word(y, A);
     BN_mod_add(y, y, tmp, p, bnctx);
+
+    /* tmp2 = (p-1)/2 */
+    BN_copy(tmp2, p);
+    BN_sub_word(tmp2, 1);
+    BN_rshift1(tmp2, tmp2);
+    BN_mod_exp(tmp, y, tmp2, p, bnctx);
+
+    if (!BN_is_one(tmp)) {
+        printf("This is a bad point for elligator, expected failure\n");
+        return NULL;
+    }
 
     /* y = sqrt(y**2)*/
     my_sqrt(y, neg_one, p, bnctx);
@@ -257,6 +276,7 @@ unsigned char *elligator2_inv(unsigned char *buffer, size_t len) {
     EVP_PKEY_CTX *pctx;
     EVP_PKEY *pkey;
     size_t i;
+    unsigned char tc;
 
     A = 486662;
     u = 2;
@@ -396,14 +416,20 @@ unsigned char *elligator2_inv(unsigned char *buffer, size_t len) {
 
     my_sqrt(y, neg_one, p, bnctx);
 
-    /* BN_mod_mul(y, y, e, p, bnctx); */
-    /* BN_mod_mul(y, y, neg_one, p, bnctx); */
+    BN_mod_mul(y, y, e, p, bnctx);
+    BN_mod_mul(y, y, neg_one, p, bnctx);
 
 
     skeylen = BN_num_bytes(x);
     skey = OPENSSL_malloc(BN_num_bytes(x));
 
     BN_bn2bin(x, skey);
+
+    for (i = 0; i < 32 / 2 ; ++i) {
+        tc = skey[i];
+        skey[i] = skey[32 - i - 1];
+        skey[32 - i - 1] = tc;
+    }
 
     printf("Inverse r \n%s\n", BN_bn2dec(r));
     printf("Inverse v \n%s\n", BN_bn2dec(v));
