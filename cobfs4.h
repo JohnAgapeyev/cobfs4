@@ -588,7 +588,11 @@ void test_elligator(void) {
 
     skey = OPENSSL_malloc(1024);
 
-    EVP_PKEY_get_raw_public_key(pkey, skey, &skeylen);
+    memset(skey, 0, 1024);
+
+    if (!EVP_PKEY_get_raw_public_key(pkey, skey, &skeylen)) {
+        printf("Get raw call failed\n");
+    }
 
     BN_bin2bn(skey, skeylen, x);
 
