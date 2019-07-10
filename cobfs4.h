@@ -72,11 +72,23 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
 
     EVP_PKEY_get_raw_public_key(pkey, skey, &skeylen);
 
+    skeylen = 32;
+
+    printf("Pre endian\n");
+    for (i = 0; i < 32; ++i) {
+        printf("%02x", skey[i]);
+    }
+    printf("\n");
     for (i = 0; i < skeylen / 2 ; ++i) {
         tc = skey[i];
         skey[i] = skey[skeylen - i - 1];
         skey[skeylen - i - 1] = tc;
     }
+    printf("Post endian\n");
+    for (i = 0; i < 32; ++i) {
+        printf("%02x", skey[i]);
+    }
+    printf("\n");
 
     BN_bin2bn(skey, skeylen, x);
     BN_mod(x, x, p, bnctx);
@@ -257,7 +269,7 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
 }
 
 /* EVP_PKEY *elligator2_inv(unsigned char *buffer, size_t len) { */
-unsigned char *elligator2_inv(unsigned char *buffer, size_t len) {
+unsigned char *elligator2_inv(const unsigned char *buffer, size_t len) {
     BIGNUM *r;
     BIGNUM *v;
     BIGNUM *e;
@@ -310,6 +322,12 @@ unsigned char *elligator2_inv(unsigned char *buffer, size_t len) {
     BN_sub_word(p_minus_one, 1);
 
     BN_bin2bn(buffer, len, r);
+
+    printf("Test buffer\n");
+    for (i = 0; i < 32; ++i) {
+        printf("%02x", buffer[i]);
+    }
+    printf("\n");
 
     /*
      * Do all the math here
@@ -419,17 +437,26 @@ unsigned char *elligator2_inv(unsigned char *buffer, size_t len) {
     BN_mod_mul(y, y, e, p, bnctx);
     BN_mod_mul(y, y, neg_one, p, bnctx);
 
-
     skeylen = BN_num_bytes(x);
     skey = OPENSSL_malloc(BN_num_bytes(x));
 
     BN_bn2bin(x, skey);
 
+    printf("Pre endian\n");
+    for (i = 0; i < 32; ++i) {
+        printf("%02x", skey[i]);
+    }
+    printf("\n");
     for (i = 0; i < 32 / 2 ; ++i) {
         tc = skey[i];
         skey[i] = skey[32 - i - 1];
         skey[32 - i - 1] = tc;
     }
+    printf("Post endian\n");
+    for (i = 0; i < 32; ++i) {
+        printf("%02x", skey[i]);
+    }
+    printf("\n");
 
     printf("Inverse r \n%s\n", BN_bn2dec(r));
     printf("Inverse v \n%s\n", BN_bn2dec(v));
@@ -483,7 +510,7 @@ void test_elligator(void) {
     BN_exp(p, p, tmp, bnctx);
     BN_sub_word(p, 19);
 
-    BN_nnmod(x, x, p, bnctx);
+    /* BN_nnmod(x, x, p, bnctx); */
 
     BN_bn2bin(x, skey);
 
