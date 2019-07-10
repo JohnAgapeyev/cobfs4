@@ -485,7 +485,8 @@ unsigned char *elligator2_inv(const unsigned char *buffer, size_t len) {
     BN_mod_mul(y, y, neg_one, p, bnctx);
 
     skeylen = BN_num_bytes(x);
-    skey = OPENSSL_malloc(BN_num_bytes(x));
+    /* skey = OPENSSL_malloc(BN_num_bytes(x)); */
+    skey = OPENSSL_malloc(1024);
 
     BN_bn2bin(x, skey);
 
