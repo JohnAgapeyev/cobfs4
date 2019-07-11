@@ -265,7 +265,14 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
 
     printf("Map r byte size %lu\n", BN_num_bytes(r));
 
+    memset(skey, 0, 32);
     BN_bn2bin(r, skey + (32 - BN_num_bytes(r)));
+
+    printf("Map post write\n");
+    for (i = 0; i < 32; ++i) {
+        printf("%02x", skey[i]);
+    }
+    printf("\n");
 
     EVP_PKEY_CTX_free(pctx);
 
@@ -479,6 +486,7 @@ unsigned char *elligator2_inv(const unsigned char *buffer, size_t len) {
     /* skey = OPENSSL_malloc(BN_num_bytes(x)); */
     skey = OPENSSL_malloc(1024);
 
+    memset(skey, 0, 32);
     BN_bn2bin(x, skey + (32 - BN_num_bytes(x)));
 
     printf("Pre endian\n");
