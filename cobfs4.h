@@ -83,30 +83,14 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
 
     /* skeylen = 32; */
 
-    printf("Pre endian\n");
-    for (i = 0; i < 32; ++i) {
-        printf("%02x", skey[i]);
-    }
-    printf("\n");
     for (i = 0; i < skeylen / 2 ; ++i) {
         tc = skey[i];
         skey[i] = skey[skeylen - i - 1];
         skey[skeylen - i - 1] = tc;
     }
-    printf("Post endian\n");
-    for (i = 0; i < 32; ++i) {
-        printf("%02x", skey[i]);
-    }
-    printf("\n");
 
     BN_bin2bn(skey, skeylen, x);
     BN_mod(x, x, p, bnctx);
-
-    /* BN_dec2bn(&x, "23454241202980220908205961704612506742290734245304826209886987946658985645899"); */
-    /* BN_dec2bn(&x, "36374335545667982257306059036255426864696276801784234118212621826337100597489"); */
-    /* BN_dec2bn(&x, "46361153250382670033219511755803478329607887341189111865347676255904599012937"); */
-    /* BN_dec2bn(&x, "38639291277585702452117027365758672231807046583527127817757812123002384585246"); */
-    /* BN_dec2bn(&x, "56734195017185880291527346948098815585360359419103566189176114437352872486756"); */
 
     /*
      * Do all the math here
@@ -139,22 +123,12 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
         /* return NULL; */
     }
 
-
     /* tmp = -u*x*(x+A) */
-#if 0
-    BN_set_word(tmp, A);
-    BN_add(tmp, x, tmp);
-    BN_mod_mul(tmp, tmp, x, p, bnctx);
-    BN_mul_word(tmp, u);
-    BN_mod_mul(tmp, tmp, neg_one, p, bnctx);
-#else
     BN_set_word(tmp, A);
     BN_mod_add(tmp, tmp, x, p, bnctx);
     BN_mod_mul(tmp, tmp, x, p, bnctx);
-
     BN_mul_word(tmp, u);
     BN_mod_mul(tmp, tmp, neg_one, p, bnctx);
-#endif
 
     /* tmp2 = (p-1)/2 */
     BN_copy(tmp2, p);
@@ -197,20 +171,11 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     /* y = sqrt(y**2)*/
     my_sqrt(y, neg_one, p, bnctx);
 
-    /*
-    BN_mod_sqrt(y, y, p, bnctx);
-    BN_mod_mul(y, y, neg_one, p, bnctx);
-    */
-
-    /* BN_mod(y, y, p, bnctx); */
-
-#if 1
     if (BN_is_zero(y)) {
         /* Precondition failed */
         goto error;
         /* return NULL; */
     }
-#endif
 
     /* tmp = (p-1)/2 */
     BN_copy(tmp, p);
@@ -225,7 +190,6 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
      *  - r = sqrt(-(x+A)/(ux))
      */
     if (BN_cmp(y, tmp) == 1) {
-        printf("Not element\n");
         /* y is NOT element of sqrt(Fq) */
         BN_copy(r, x);
         BN_add_word(r, A);
@@ -237,13 +201,8 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
         BN_mod_inverse(tmp, tmp, p, bnctx);
         BN_mod_mul(r, r, tmp, p, bnctx);
 
-        /*
-        BN_mod_sqrt(r, r, p, bnctx);
-        BN_mod_mul(r, r, neg_one, p, bnctx);
-        */
         my_sqrt(r, neg_one, p, bnctx);
     } else {
-        printf("Is element\n");
         /* y is element of sqrt(Fq) */
         BN_copy(r, x);
         BN_add_word(r, A);
@@ -253,26 +212,11 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
         BN_mod_inverse(r, r, p, bnctx);
         BN_mod_mul(r, r, tmp, p, bnctx);
 
-        /*
-        BN_mod_sqrt(r, r, p, bnctx);
-        BN_mod_mul(r, r, neg_one, p, bnctx);
-        */
         my_sqrt(r, neg_one, p, bnctx);
     }
-    printf("Map x \n%s\n", BN_bn2dec(x));
-    printf("Map y \n%s\n", BN_bn2dec(y));
-    printf("Map r \n%s\n", BN_bn2dec(r));
-
-    printf("Map r byte size %lu\n", BN_num_bytes(r));
 
     memset(skey, 0, 32);
     BN_bn2bin(r, skey + (32 - BN_num_bytes(r)));
-
-    printf("Map post write\n");
-    for (i = 0; i < 32; ++i) {
-        printf("%02x", skey[i]);
-    }
-    printf("\n");
 
     EVP_PKEY_CTX_free(pctx);
 
@@ -364,14 +308,6 @@ unsigned char *elligator2_inv(const unsigned char *buffer, size_t len) {
     /* BN_bin2bn(buffer, len, r); */
     BN_bin2bn(buffer, 32, r);
 
-    /* BN_mod(r, r, p, bnctx); */
-
-    printf("Test buffer\n");
-    for (i = 0; i < 32; ++i) {
-        printf("%02x", buffer[i]);
-    }
-    printf("\n");
-
     /*
      * Do all the math here
      * r is the raw buffer input
@@ -436,8 +372,6 @@ unsigned char *elligator2_inv(const unsigned char *buffer, size_t len) {
     BN_mul_word(tmp, A);
     BN_mod_add(e, e, tmp, p, bnctx);
 
-    /* printf("Inverse e pre legendre\n%s\n", BN_bn2dec(e)); */
-
     BN_sub(tmp, p, BN_value_one());
     BN_rshift1(tmp, tmp);
     BN_mod_exp(e, e, tmp, p, bnctx);
@@ -445,16 +379,6 @@ unsigned char *elligator2_inv(const unsigned char *buffer, size_t len) {
     if (BN_cmp(e, p_minus_one) == 0) {
         BN_copy(e, neg_one);
     }
-
-    /*
-    if (BN_cmp(e, neg_one) == 0) {
-        printf("e is actually negative one\n");
-    } else {
-        printf("Inverse e \n%s\n", BN_bn2dec(e));
-        printf("Inverse p \n%s\n", BN_bn2dec(p));
-        printf("Inverse neg one \n%s\n", BN_bn2dec(neg_one));
-    }
-    */
 
     /* x = ev-(1-e)A/2 */
     BN_set_word(tmp, 1);
@@ -472,11 +396,6 @@ unsigned char *elligator2_inv(const unsigned char *buffer, size_t len) {
     BN_mul_word(tmp, A);
     BN_mod_add(y, y, tmp, p, bnctx);
 
-    /*
-    BN_mod_sqrt(y, y, p, bnctx);
-    BN_mod_mul(y, y, neg_one, p, bnctx);
-    */
-
     my_sqrt(y, neg_one, p, bnctx);
 
     BN_mod_mul(y, y, e, p, bnctx);
@@ -489,28 +408,11 @@ unsigned char *elligator2_inv(const unsigned char *buffer, size_t len) {
     memset(skey, 0, 32);
     BN_bn2bin(x, skey + (32 - BN_num_bytes(x)));
 
-    printf("Pre endian\n");
-    for (i = 0; i < 32; ++i) {
-        printf("%02x", skey[i]);
-    }
-    printf("\n");
     for (i = 0; i < 32 / 2 ; ++i) {
         tc = skey[i];
         skey[i] = skey[32 - i - 1];
         skey[32 - i - 1] = tc;
     }
-    printf("Post endian\n");
-    for (i = 0; i < 32; ++i) {
-        printf("%02x", skey[i]);
-    }
-    printf("\n");
-
-    printf("Inverse r \n%s\n", BN_bn2dec(r));
-    printf("Inverse v \n%s\n", BN_bn2dec(v));
-    printf("Inverse e \n%s\n", BN_bn2dec(e));
-    printf("Inverse x \n%s\n", BN_bn2dec(x));
-    printf("Inverse y \n%s\n", BN_bn2dec(y));
-
     pkey = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519, NULL, skey, skeylen);
 
     BN_free(v);
