@@ -44,6 +44,10 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     tmp2 = BN_new();
     bnctx = BN_CTX_new();
 
+    EVP_PKEY_get_raw_public_key(pkey, NULL, &skeylen);
+    skey = OPENSSL_malloc(skeylen);
+    EVP_PKEY_get_raw_public_key(pkey, skey, &skeylen);
+
     /* p = (2**255)-19 */
     BN_set_word(p, 2);
     BN_set_word(tmp, 255);
@@ -55,12 +59,6 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
 
     BN_copy(p_minus_one, p);
     BN_sub_word(p_minus_one, 1);
-
-    EVP_PKEY_get_raw_public_key(pkey, NULL, &skeylen);
-
-    skey = OPENSSL_malloc(skeylen);
-
-    EVP_PKEY_get_raw_public_key(pkey, skey, &skeylen);
 
     for (i = 0; i < skeylen / 2 ; ++i) {
         tc = skey[i];
@@ -193,36 +191,41 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     memset(skey, 0, skeylen);
     BN_bn2bin(r, skey + (skeylen - BN_num_bytes(r)));
 
-    EVP_PKEY_CTX_free(pctx);
-
-    BN_free(x);
-    BN_free(y);
-    BN_free(p);
-    BN_free(r);
-    BN_free(neg_one);
-    BN_free(p_minus_one);
-    BN_free(tmp);
-    BN_free(tmp2);
-
     BN_CTX_free(bnctx);
+    BN_free(tmp2);
+    BN_free(tmp);
+    BN_free(p_minus_one);
+    BN_free(neg_one);
+    BN_free(r);
+    BN_free(p);
+    BN_free(y);
+    BN_free(x);
+    EVP_PKEY_CTX_free(pctx);
 
     return skey;
 
 error:
-    EVP_PKEY_CTX_free(pctx);
-
-    BN_free(x);
-    BN_free(y);
-    BN_free(p);
-    BN_free(r);
-    BN_free(neg_one);
-    BN_free(p_minus_one);
-    BN_free(tmp);
-    BN_free(tmp2);
-
-    BN_CTX_free(bnctx);
-
     OPENSSL_free(skey);
+free_bignum_ctx:
+    BN_CTX_free(bnctx);
+free_tmp2:
+    BN_free(tmp2);
+free_tmp:
+    BN_free(tmp);
+free_p_minus_one:
+    BN_free(p_minus_one);
+free_neg_one:
+    BN_free(neg_one);
+free_r:
+    BN_free(r);
+free_p:
+    BN_free(p);
+free_y:
+    BN_free(y);
+free_x:
+    BN_free(x);
+free_pkey_ctx:
+    EVP_PKEY_CTX_free(pctx);
 
     return NULL;
 }
