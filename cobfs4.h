@@ -402,32 +402,97 @@ EVP_PKEY *elligator2_inv(unsigned char buffer[32]) {
     skeylen = 32;
 
     pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_X25519, NULL);
+    if (!pctx) {
+        return NULL;
+    }
 
     v = BN_new();
+    if (!v) {
+        goto free_pkey_ctx;
+    }
+
     e = BN_new();
+    if (!e) {
+        goto free_v;
+    }
+
     x = BN_new();
+    if (!x) {
+        goto free_e;
+    }
+
     y = BN_new();
+    if (!y) {
+        goto free_x;
+    }
+
     p = BN_new();
+    if (!p) {
+        goto free_y;
+    }
+
     r = BN_new();
+    if (!r) {
+        goto free_p;
+    }
+
     neg_one = BN_new();
+    if (!neg_one) {
+        goto free_r;
+    }
+
     p_minus_one = BN_new();
+    if (!p_minus_one) {
+        goto free_neg_one;
+    }
+
     tmp = BN_new();
+    if (!tmp) {
+        goto free_p_minus_one;
+    }
+
     tmp2 = BN_new();
+    if (!tmp2) {
+        goto free_tmp;
+    }
+
     bnctx = BN_CTX_new();
+    if (!bnctx) {
+        goto free_tmp2;
+    }
+
+    skey = OPENSSL_malloc(skeylen);
+    if (!skey) {
+        goto free_bignum_ctx;
+    }
 
     /* p = (2**255)-19 */
-    BN_set_word(p, 2);
-    BN_set_word(tmp, 255);
-    BN_exp(p, p, tmp, bnctx);
-    BN_sub_word(p, 19);
+    if (!BN_set_word(p, 2)) {
+        goto error;
+    }
+    if (!BN_set_word(tmp, 255)) {
+        goto error;
+    }
+    if (!BN_exp(p, p, tmp, bnctx)) {
+        goto error;
+    }
+    if (!BN_sub_word(p, 19)) {
+        goto error;
+    }
 
     BN_zero(neg_one);
-    BN_sub_word(neg_one, 1);
-
-    BN_copy(p_minus_one, p);
-    BN_sub_word(p_minus_one, 1);
-
-    BN_bin2bn(buffer, 32, r);
+    if (!BN_sub_word(neg_one, 1)) {
+        goto error;
+    }
+    if (!BN_copy(p_minus_one, p)) {
+        goto error;
+    }
+    if (!BN_sub_word(p_minus_one, 1)) {
+        goto error;
+    }
+    if (!BN_bin2bn(buffer, 32, r)) {
+        goto error;
+    }
 
     /*
      * Do all the math here
@@ -447,9 +512,15 @@ EVP_PKEY *elligator2_inv(unsigned char buffer[32]) {
      */
 
     /* tmp = 1+ur**2 */
-    BN_mod_sqr(tmp, r, p, bnctx);
-    BN_mul_word(tmp, u);
-    BN_add_word(tmp, 1);
+    if (!BN_mod_sqr(tmp, r, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mul_word(tmp, u)) {
+        goto error;
+    }
+    if (!BN_add_word(tmp, 1)) {
+        goto error;
+    }
 
     if (BN_is_zero(tmp)) {
         /* Precondition failed */
@@ -457,14 +528,26 @@ EVP_PKEY *elligator2_inv(unsigned char buffer[32]) {
     }
 
     /* tmp2 = (1+ur**2)**2 */
-    BN_mod_sqr(tmp2, tmp, p, bnctx);
+    if (!BN_mod_sqr(tmp2, tmp, p, bnctx)) {
+        goto error;
+    }
 
     /* tmp = (A**2)u(r**2) */
-    BN_mod_sqr(tmp, r, p, bnctx);
-    BN_mul_word(tmp, u);
-    BN_mul_word(tmp, A);
-    BN_mul_word(tmp, A);
-    BN_nnmod(tmp, tmp, p, bnctx);
+    if (!BN_mod_sqr(tmp, r, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mul_word(tmp, u)) {
+        goto error;
+    }
+    if (!BN_mul_word(tmp, A)) {
+        goto error;
+    }
+    if (!BN_mul_word(tmp, A)) {
+        goto error;
+    }
+    if (!BN_nnmod(tmp, tmp, p, bnctx)) {
+        goto error;
+    }
 
     if (BN_cmp(tmp, tmp2) == 0) {
         /* Precondition failed */
@@ -472,58 +555,118 @@ EVP_PKEY *elligator2_inv(unsigned char buffer[32]) {
     }
 
     /* v = -A/(1+ur**2) */
-    BN_set_word(tmp, A);
-    BN_mul(tmp, tmp, neg_one, bnctx);
-    BN_mod_sqr(v, r, p, bnctx);
-    BN_mul_word(v, u);
-    BN_add_word(v, 1);
+    if (!BN_set_word(tmp, A)) {
+        goto error;
+    }
+    if (!BN_mul(tmp, tmp, neg_one, bnctx)) {
+        goto error;
+    }
+    if (!BN_mod_sqr(v, r, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mul_word(v, u)) {
+        goto error;
+    }
+    if (!BN_add_word(v, 1)) {
+        goto error;
+    }
 
-    BN_mod_inverse(v, v, p, bnctx);
-    BN_mod_mul(v, tmp, v, p, bnctx);
-
-    BN_mod(v, v, p, bnctx);
+    if (!BN_mod_inverse(v, v, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mod_mul(v, tmp, v, p, bnctx)) {
+        goto error;
+    }
 
     /* e = (v**3+Av**2+v)**((p-1)/2) */
-    BN_mod_sqr(e, v, p, bnctx);
-    BN_mod_mul(e, e, v, p, bnctx);
-    BN_mod_add(e, e, v, p, bnctx);
-    BN_mod_sqr(tmp, v, p, bnctx);
-    BN_mul_word(tmp, A);
-    BN_mod_add(e, e, tmp, p, bnctx);
+    if (!BN_mod_sqr(e, v, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mod_mul(e, e, v, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mod_add(e, e, v, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mod_sqr(tmp, v, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mul_word(tmp, A)) {
+        goto error;
+    }
+    if (!BN_mod_add(e, e, tmp, p, bnctx)) {
+        goto error;
+    }
 
-    BN_sub(tmp, p, BN_value_one());
-    BN_rshift1(tmp, tmp);
-    BN_mod_exp(e, e, tmp, p, bnctx);
+    if (!BN_sub(tmp, p, BN_value_one())) {
+        goto error;
+    }
+    if (!BN_rshift1(tmp, tmp)) {
+        goto error;
+    }
+    if (!BN_mod_exp(e, e, tmp, p, bnctx)) {
+        goto error;
+    }
 
     if (BN_cmp(e, p_minus_one) == 0) {
-        BN_copy(e, neg_one);
+        if (!BN_copy(e, neg_one)) {
+            goto error;
+        }
     }
 
     /* x = ev-(1-e)A/2 */
-    BN_set_word(tmp, 1);
-    BN_sub(tmp, tmp, e);
-    BN_mul_word(tmp, A);
-    BN_rshift1(tmp, tmp);
-    BN_mod_mul(x, e, v, p, bnctx);
-    BN_mod_sub(x, x, tmp, p, bnctx);
+    if (!BN_set_word(tmp, 1)) {
+        goto error;
+    }
+    if (!BN_sub(tmp, tmp, e)) {
+        goto error;
+    }
+    if (!BN_mul_word(tmp, A)) {
+        goto error;
+    }
+    if (!BN_rshift1(tmp, tmp)) {
+        goto error;
+    }
+    if (!BN_mod_mul(x, e, v, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mod_sub(x, x, tmp, p, bnctx)) {
+        goto error;
+    }
 
     /* y = -e*sqrt(x**3+Ax**2+x) */
-    BN_mod_sqr(y, x, p, bnctx);
-    BN_mod_mul(y, y, x, p, bnctx);
-    BN_mod_add(y, y, x, p, bnctx);
-    BN_mod_sqr(tmp, x, p, bnctx);
-    BN_mul_word(tmp, A);
-    BN_mod_add(y, y, tmp, p, bnctx);
-
-    BN_mod_sqrt(y, y, p, bnctx);
-
-    BN_mod_mul(y, y, e, p, bnctx);
-    BN_mod_mul(y, y, neg_one, p, bnctx);
-
-    skey = OPENSSL_malloc(skeylen);
+    if (!BN_mod_sqr(y, x, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mod_mul(y, y, x, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mod_add(y, y, x, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mod_sqr(tmp, x, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mul_word(tmp, A)) {
+        goto error;
+    }
+    if (!BN_mod_add(y, y, tmp, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mod_sqrt(y, y, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mod_mul(y, y, e, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mod_mul(y, y, neg_one, p, bnctx)) {
+        goto error;
+    }
 
     memset(skey, 0, skeylen);
-    BN_bn2bin(x, skey + (skeylen - BN_num_bytes(x)));
+    if (!BN_bn2bin(x, skey + (skeylen - BN_num_bytes(x)))) {
+        goto error;
+    }
 
     for (i = 0; i < skeylen / 2 ; ++i) {
         tc = skey[i];
@@ -531,6 +674,9 @@ EVP_PKEY *elligator2_inv(unsigned char buffer[32]) {
         skey[skeylen - i - 1] = tc;
     }
     pkey = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519, NULL, skey, skeylen);
+    if (!pkey) {
+        goto error;
+    }
 
     OPENSSL_free(skey);
     BN_CTX_free(bnctx);

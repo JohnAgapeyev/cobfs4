@@ -1,5 +1,5 @@
 BASEFLAGS=-Wall -Wextra -std=c89 -Wpedantic -D_POSIX_C_SOURCE=200809L -Wuninitialized -Wundef -Wcast-align -Wstrict-overflow=2 -Wwrite-strings -Wno-format-nonliteral
-DEBUGFLAGS=-ggdb -g3 -O0 -fsanitize=address
+DEBUGFLAGS=-ggdb -g3 -O0
 RELEASEFLAGS=-s -O3 -march=native -flto -DNDEBUG
 CLIBS=-lcrypto
 EXEC=cobfs4
