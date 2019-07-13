@@ -33,32 +33,91 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     u = 2;
 
     pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_X25519, NULL);
+    if (!pctx) {
+        return NULL;
+    }
 
     x = BN_new();
-    y = BN_new();
-    p = BN_new();
-    r = BN_new();
-    neg_one = BN_new();
-    p_minus_one = BN_new();
-    tmp = BN_new();
-    tmp2 = BN_new();
-    bnctx = BN_CTX_new();
+    if (!x) {
+        goto free_pkey_ctx;
+    }
 
-    EVP_PKEY_get_raw_public_key(pkey, NULL, &skeylen);
+    y = BN_new();
+    if (!y) {
+        goto free_x;
+    }
+
+    p = BN_new();
+    if (!p) {
+        goto free_y;
+    }
+
+    r = BN_new();
+    if (!r) {
+        goto free_p;
+    }
+
+    neg_one = BN_new();
+    if (!neg_one) {
+        goto free_r;
+    }
+
+    p_minus_one = BN_new();
+    if (!p_minus_one) {
+        goto free_neg_one;
+    }
+
+    tmp = BN_new();
+    if (!tmp) {
+        goto free_p_minus_one;
+    }
+
+    tmp2 = BN_new();
+    if (!tmp2) {
+        goto free_tmp;
+    }
+
+    bnctx = BN_CTX_new();
+    if (!bnctx) {
+        goto free_tmp2;
+    }
+
+    if (!EVP_PKEY_get_raw_public_key(pkey, NULL, &skeylen)) {
+        goto free_bignum_ctx;
+    }
     skey = OPENSSL_malloc(skeylen);
-    EVP_PKEY_get_raw_public_key(pkey, skey, &skeylen);
+    if (!skey) {
+        goto free_bignum_ctx;
+    }
+    if (!EVP_PKEY_get_raw_public_key(pkey, skey, &skeylen)) {
+        goto error;
+    }
 
     /* p = (2**255)-19 */
-    BN_set_word(p, 2);
-    BN_set_word(tmp, 255);
-    BN_exp(p, p, tmp, bnctx);
-    BN_sub_word(p, 19);
+    if (!BN_set_word(p, 2)) {
+        goto error;
+    }
+    if (!BN_set_word(tmp, 255)) {
+        goto error;
+    }
+    if (!BN_exp(p, p, tmp, bnctx)) {
+        goto error;
+    }
+    if (!BN_sub_word(p, 19)) {
+        goto error;
+    }
 
     BN_zero(neg_one);
-    BN_sub_word(neg_one, 1);
+    if (!BN_sub_word(neg_one, 1)) {
+        goto error;
+    }
 
-    BN_copy(p_minus_one, p);
-    BN_sub_word(p_minus_one, 1);
+    if (!BN_copy(p_minus_one, p)) {
+        goto error;
+    }
+    if (!BN_sub_word(p_minus_one, 1)) {
+        goto error;
+    }
 
     for (i = 0; i < skeylen / 2 ; ++i) {
         tc = skey[i];
@@ -66,8 +125,12 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
         skey[skeylen - i - 1] = tc;
     }
 
-    BN_bin2bn(skey, skeylen, x);
-    BN_mod(x, x, p, bnctx);
+    if (!BN_bin2bn(skey, skeylen, x)) {
+        goto error;
+    }
+    if (!BN_mod(x, x, p, bnctx)) {
+        goto error;
+    }
 
     /*
      * Do all the math here
@@ -90,8 +153,12 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
      *  - r = sqrt(-(x+A)/(ux))
     */
 
-    BN_set_word(tmp, A);
-    BN_mul(tmp, tmp, neg_one, bnctx);
+    if (!BN_set_word(tmp, A)) {
+        goto error;
+    }
+    if (!BN_mul(tmp, tmp, neg_one, bnctx)) {
+        goto error;
+    }
 
     /* Check if x == -A */
     if (BN_cmp(x, tmp) == 0) {
@@ -100,22 +167,42 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     }
 
     /* tmp = -u*x*(x+A) */
-    BN_set_word(tmp, A);
-    BN_mod_add(tmp, tmp, x, p, bnctx);
-    BN_mod_mul(tmp, tmp, x, p, bnctx);
-    BN_mul_word(tmp, u);
-    BN_mod_mul(tmp, tmp, neg_one, p, bnctx);
+    if (!BN_set_word(tmp, A)) {
+        goto error;
+    }
+    if (!BN_mod_add(tmp, tmp, x, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mod_mul(tmp, tmp, x, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mul_word(tmp, u)) {
+        goto error;
+    }
+    if (!BN_mod_mul(tmp, tmp, neg_one, p, bnctx)) {
+        goto error;
+    }
 
     /* tmp2 = (p-1)/2 */
-    BN_copy(tmp2, p);
-    BN_sub_word(tmp2, 1);
-    BN_rshift1(tmp2, tmp2);
+    if (!BN_copy(tmp2, p)) {
+        goto error;
+    }
+    if (!BN_sub_word(tmp2, 1)) {
+        goto error;
+    }
+    if (!BN_rshift1(tmp2, tmp2)) {
+        goto error;
+    }
 
     /* (-ux(x + A))**((p-1)/2) */
-    BN_mod_exp(tmp, tmp, tmp2, p, bnctx);
+    if (!BN_mod_exp(tmp, tmp, tmp2, p, bnctx)) {
+        goto error;
+    }
 
     if (BN_cmp(tmp, p_minus_one) == 0) {
-        BN_copy(tmp, neg_one);
+        if (!BN_copy(tmp, neg_one)) {
+            goto error;
+        }
     }
 
     if (!BN_is_one(tmp)) {
@@ -124,18 +211,38 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     }
 
     /* y = y**2 = x**3 + Ax**2 + x */
-    BN_mod_sqr(tmp, x, p, bnctx);
-    BN_mod_mul(tmp, tmp, x, p, bnctx);
-    BN_mod_add(tmp, tmp, x, p, bnctx);
-    BN_mod_sqr(y, x, p, bnctx);
-    BN_mul_word(y, A);
-    BN_mod_add(y, y, tmp, p, bnctx);
+    if (!BN_mod_sqr(tmp, x, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mod_mul(tmp, tmp, x, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mod_add(tmp, tmp, x, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mod_sqr(y, x, p, bnctx)) {
+        goto error;
+    }
+    if (!BN_mul_word(y, A)) {
+        goto error;
+    }
+    if (!BN_mod_add(y, y, tmp, p, bnctx)) {
+        goto error;
+    }
 
     /* tmp2 = (p-1)/2 */
-    BN_copy(tmp2, p);
-    BN_sub_word(tmp2, 1);
-    BN_rshift1(tmp2, tmp2);
-    BN_mod_exp(tmp, y, tmp2, p, bnctx);
+    if (!BN_copy(tmp2, p)) {
+        goto error;
+    }
+    if (!BN_sub_word(tmp2, 1)) {
+        goto error;
+    }
+    if (!BN_rshift1(tmp2, tmp2)) {
+        goto error;
+    }
+    if (!BN_mod_exp(tmp, y, tmp2, p, bnctx)) {
+        goto error;
+    }
 
     if (!BN_is_one(tmp)) {
         /* y is not a square, this is an invalid point */
@@ -143,7 +250,9 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     }
 
     /* y = sqrt(y**2)*/
-    BN_mod_sqrt(y, y, p, bnctx);
+    if (!BN_mod_sqrt(y, y, p, bnctx)) {
+        goto error;
+    }
 
     if (BN_is_zero(y)) {
         /* Precondition failed */
@@ -151,9 +260,15 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     }
 
     /* tmp = (p-1)/2 */
-    BN_copy(tmp, p);
-    BN_sub_word(tmp, 1);
-    BN_rshift1(tmp, tmp);
+    if (!BN_copy(tmp, p)) {
+        goto error;
+    }
+    if (!BN_sub_word(tmp, 1)) {
+        goto error;
+    }
+    if (!BN_rshift1(tmp, tmp)) {
+        goto error;
+    }
 
     /*
      * Output is r
@@ -164,32 +279,64 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
      */
     if (BN_cmp(y, tmp) == 1) {
         /* y is NOT element of sqrt(Fq) */
-        BN_copy(r, x);
-        BN_add_word(r, A);
-        BN_mod_mul(r, r, neg_one, p, bnctx);
+        if (!BN_copy(r, x)) {
+            goto error;
+        }
+        if (!BN_add_word(r, A)) {
+            goto error;
+        }
+        if (!BN_mod_mul(r, r, neg_one, p, bnctx)) {
+            goto error;
+        }
 
-        BN_copy(tmp, x);
-        BN_mul_word(tmp, u);
+        if (!BN_copy(tmp, x)) {
+            goto error;
+        }
+        if (!BN_mul_word(tmp, u)) {
+            goto error;
+        }
 
-        BN_mod_inverse(tmp, tmp, p, bnctx);
-        BN_mod_mul(r, r, tmp, p, bnctx);
+        if (!BN_mod_inverse(tmp, tmp, p, bnctx)) {
+            goto error;
+        }
+        if (!BN_mod_mul(r, r, tmp, p, bnctx)) {
+            goto error;
+        }
 
-        BN_mod_sqrt(r, r, p, bnctx);
+        if (!BN_mod_sqrt(r, r, p, bnctx)) {
+            goto error;
+        }
     } else {
         /* y is element of sqrt(Fq) */
-        BN_copy(r, x);
-        BN_add_word(r, A);
-        BN_mul_word(r, u);
-        BN_mod_mul(tmp, x, neg_one, p, bnctx);
+        if (!BN_copy(r, x)) {
+            goto error;
+        }
+        if (!BN_add_word(r, A)) {
+            goto error;
+        }
+        if (!BN_mul_word(r, u)) {
+            goto error;
+        }
+        if (!BN_mod_mul(tmp, x, neg_one, p, bnctx)) {
+            goto error;
+        }
 
-        BN_mod_inverse(r, r, p, bnctx);
-        BN_mod_mul(r, r, tmp, p, bnctx);
+        if (!BN_mod_inverse(r, r, p, bnctx)) {
+            goto error;
+        }
+        if (!BN_mod_mul(r, r, tmp, p, bnctx)) {
+            goto error;
+        }
 
-        BN_mod_sqrt(r, r, p, bnctx);
+        if (!BN_mod_sqrt(r, r, p, bnctx)) {
+            goto error;
+        }
     }
 
     memset(skey, 0, skeylen);
-    BN_bn2bin(r, skey + (skeylen - BN_num_bytes(r)));
+    if (!BN_bn2bin(r, skey + (skeylen - BN_num_bytes(r)))) {
+        goto error;
+    }
 
     BN_CTX_free(bnctx);
     BN_free(tmp2);
@@ -226,7 +373,6 @@ free_x:
     BN_free(x);
 free_pkey_ctx:
     EVP_PKEY_CTX_free(pctx);
-
     return NULL;
 }
 
@@ -387,38 +533,47 @@ EVP_PKEY *elligator2_inv(unsigned char buffer[32]) {
     pkey = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519, NULL, skey, skeylen);
 
     OPENSSL_free(skey);
-
-    BN_free(v);
-    BN_free(e);
-    BN_free(x);
-    BN_free(y);
-    BN_free(p);
-    BN_free(r);
-    BN_free(neg_one);
-    BN_free(p_minus_one);
-    BN_free(tmp);
-    BN_free(tmp2);
-
     BN_CTX_free(bnctx);
+    BN_free(tmp2);
+    BN_free(tmp);
+    BN_free(p_minus_one);
+    BN_free(neg_one);
+    BN_free(r);
+    BN_free(p);
+    BN_free(y);
+    BN_free(x);
+    BN_free(e);
+    BN_free(v);
     EVP_PKEY_CTX_free(pctx);
 
     return pkey;
 
 error:
-    BN_free(v);
-    BN_free(e);
-    BN_free(x);
-    BN_free(y);
-    BN_free(p);
-    BN_free(r);
-    BN_free(neg_one);
-    BN_free(p_minus_one);
-    BN_free(tmp);
-    BN_free(tmp2);
-
+    OPENSSL_free(skey);
+free_bignum_ctx:
     BN_CTX_free(bnctx);
+free_tmp2:
+    BN_free(tmp2);
+free_tmp:
+    BN_free(tmp);
+free_p_minus_one:
+    BN_free(p_minus_one);
+free_neg_one:
+    BN_free(neg_one);
+free_r:
+    BN_free(r);
+free_p:
+    BN_free(p);
+free_y:
+    BN_free(y);
+free_x:
+    BN_free(x);
+free_e:
+    BN_free(e);
+free_v:
+    BN_free(v);
+free_pkey_ctx:
     EVP_PKEY_CTX_free(pctx);
-
     return NULL;
 }
 
