@@ -2,19 +2,26 @@ BASEFLAGS=-Wall -Wextra -std=c89 -Wpedantic -D_POSIX_C_SOURCE=200809L -Wuninitia
 DEBUGFLAGS=-ggdb -g3 -O0
 RELEASEFLAGS=-s -O3 -march=native -flto -DNDEBUG
 CLIBS=-lcrypto
-EXEC=cobfs4
+EXEC=test_cobfs4
 DEPS=$(EXEC).d
-SRCWILD=$(wildcard *.c)
+SRCS=elligator.c
+TEST_SRCS=test_main.c test_elligator.c
 HEADWILD=$(wildcard *.h)
 
-all release debug: $(patsubst %.c, %.o, $(SRCWILD))
+debug release: all
+
+all: main test
+
+main: $(patsubst %.c, %.o, $(SRCS))
+
+test: $(patsubst %.c, %.o, $(SRCS)) $(patsubst %.c, %.o, $(TEST_SRCS))
 	$(CC) $(CFLAGS) $^ $(CLIBS) -o $(EXEC)
 
 %.o: %.c
 	$(CC) -c $(CFLAGS) $< -o $(patsubst %.c, %.o, $<)
 
-$(DEPS): $(SRCWILD) $(HEADWILD)
-	@$(CC) $(CFLAGS) -MM $(SRCWILD) > $(DEPS)
+$(DEPS): $(SRCS) $(HEADWILD)
+	@$(CC) $(CFLAGS) -MM $(SRCS) > $(DEPS)
 
 ifneq ($(MAKECMDGOALS), clean)
 -include $(DEPS)
