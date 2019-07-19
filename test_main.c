@@ -3,5 +3,6 @@
 
 int main(void) {
     test_elligator();
+    test_hmac();
     return 0;
 }

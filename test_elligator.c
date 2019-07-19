@@ -6,6 +6,7 @@
 
 #include "cobfs4.h"
 #include "elligator.h"
+#include "test.h"
 
 void test_elligator(void) {
     EVP_PKEY *pkey;

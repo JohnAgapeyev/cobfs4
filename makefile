@@ -2,10 +2,10 @@ BASEFLAGS=-Wall -Wextra -std=c89 -Wpedantic -D_POSIX_C_SOURCE=200809L -Wuninitia
 DEBUGFLAGS=-ggdb -g3 -O0
 RELEASEFLAGS=-s -O3 -march=native -flto -DNDEBUG
 CLIBS=-lcrypto
-EXEC=test_cobfs4
+EXEC=cobfs4
 DEPS=$(EXEC).d
-SRCS=elligator.c
-TEST_SRCS=test_main.c test_elligator.c
+SRCS=elligator.c hmac.c
+TEST_SRCS=test_main.c test_elligator.c test_hmac.c
 HEADWILD=$(wildcard *.h)
 
 debug release: all
