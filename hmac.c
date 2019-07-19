@@ -41,6 +41,9 @@ int hmac_gen(const unsigned char *key, const size_t key_len, const unsigned char
     }
 
     memcpy(hmac, md_value, HMAC_LEN);
+
+    EVP_PKEY_free(pkey);
+    EVP_MD_CTX_free(mdctx);
     return 0;
 
 error:
