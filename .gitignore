@@ -52,3 +52,6 @@ Mkfile.old
 dkms.conf
 
 cobfs4
+
+cscope.*
+tags
