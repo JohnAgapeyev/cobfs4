@@ -1,10 +1,10 @@
-BASEFLAGS=-Wall -Wextra -std=c89 -Wpedantic -D_POSIX_C_SOURCE=200809L -Wuninitialized -Wundef -Wcast-align -Wstrict-overflow=2 -Wwrite-strings -Wno-format-nonliteral
+BASEFLAGS=-Wall -Wextra -std=c99 -Wpedantic -Wuninitialized -Wundef -Wcast-align -Wstrict-overflow=2 -Wwrite-strings -Wno-format-nonliteral
 DEBUGFLAGS=-ggdb -g3 -O0
 RELEASEFLAGS=-s -O3 -march=native -flto -DNDEBUG
 CLIBS=-lcrypto
 EXEC=cobfs4
 DEPS=$(EXEC).d
-SRCS=elligator.c hmac.c
+SRCS=elligator.c hmac.c packet.c
 TEST_SRCS=test_main.c test_elligator.c test_hmac.c
 HEADWILD=$(wildcard *.h)
 

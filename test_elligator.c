@@ -15,11 +15,13 @@ void test_elligator(void) {
     size_t skeylen;
     unsigned char *skey;
     unsigned char *skey2;
-    unsigned char *skey3;
+    int skey3;
     int count;
     int good;
     int bad;
     int invalid;
+
+    unsigned char elligator[32];
 
     /* size_t i; */
 
@@ -49,10 +51,10 @@ void test_elligator(void) {
             */
         }
 
-        skey3 = elligator2(pkey);
+        skey3 = elligator2(pkey, elligator);
 
-        if (skey3) {
-            peerkey = elligator2_inv(skey3);
+        if (skey3 == 0) {
+            peerkey = elligator2_inv(elligator);
             if (peerkey) {
                 if (!EVP_PKEY_get_raw_public_key(peerkey, skey2, &skeylen)) {
                     /*
@@ -86,7 +88,6 @@ void test_elligator(void) {
 
         OPENSSL_free(skey);
         OPENSSL_free(skey2);
-        OPENSSL_free(skey3);
     }
     EVP_PKEY_free(pkey);
 

@@ -3,13 +3,12 @@
 #include <openssl/evp.h>
 #include <openssl/bn.h>
 #include <openssl/err.h>
+#include "elligator.h"
 
-unsigned char *elligator2(EVP_PKEY *pkey) {
+int elligator2(const EVP_PKEY * const pkey, unsigned char out_elligator[static const 32]) {
     BIGNUM *r;
     BIGNUM *x;
     BIGNUM *y;
-    unsigned long A;
-    unsigned long u;
     BIGNUM *p;
     BIGNUM *p_minus_one;
     BIGNUM *tmp;
@@ -19,15 +18,13 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     unsigned char *skey;
     size_t skeylen;
     EVP_PKEY_CTX *pctx;
-    unsigned char tc;
-    size_t i;
 
-    A = 486662;
-    u = 2;
+    const unsigned long A = 486662;
+    const unsigned long u = 2;
 
     pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_X25519, NULL);
     if (!pctx) {
-        return NULL;
+        return -1;
     }
 
     x = BN_new();
@@ -112,8 +109,8 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
         goto error;
     }
 
-    for (i = 0; i < skeylen / 2 ; ++i) {
-        tc = skey[i];
+    for (size_t i = 0; i < skeylen / 2 ; ++i) {
+        const unsigned char tc = skey[i];
         skey[i] = skey[skeylen - i - 1];
         skey[skeylen - i - 1] = tc;
     }
@@ -342,7 +339,8 @@ unsigned char *elligator2(EVP_PKEY *pkey) {
     BN_free(x);
     EVP_PKEY_CTX_free(pctx);
 
-    return skey;
+    memcpy(out_elligator, skey, 32);
+    return 0;
 
 error:
     OPENSSL_free(skey);
@@ -366,17 +364,15 @@ free_x:
     BN_free(x);
 free_pkey_ctx:
     EVP_PKEY_CTX_free(pctx);
-    return NULL;
+    return -1;
 }
 
-EVP_PKEY *elligator2_inv(unsigned char buffer[32]) {
+EVP_PKEY *elligator2_inv(const unsigned char buffer[static const 32]) {
     BIGNUM *r;
     BIGNUM *v;
     BIGNUM *e;
     BIGNUM *x;
     BIGNUM *y;
-    unsigned long A;
-    unsigned long u;
     BIGNUM *p;
     BIGNUM *tmp;
     BIGNUM *tmp2;
@@ -384,15 +380,12 @@ EVP_PKEY *elligator2_inv(unsigned char buffer[32]) {
     BIGNUM *p_minus_one;
     BN_CTX *bnctx;
     unsigned char *skey;
-    size_t skeylen;
     EVP_PKEY_CTX *pctx;
     EVP_PKEY *pkey;
-    size_t i;
-    unsigned char tc;
 
-    A = 486662;
-    u = 2;
-    skeylen = 32;
+    const unsigned long A = 486662;
+    const unsigned long u = 2;
+    const size_t skeylen = 32;
 
     pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_X25519, NULL);
     if (!pctx) {
@@ -661,8 +654,8 @@ EVP_PKEY *elligator2_inv(unsigned char buffer[32]) {
         goto error;
     }
 
-    for (i = 0; i < skeylen / 2 ; ++i) {
-        tc = skey[i];
+    for (size_t i = 0; i < skeylen / 2 ; ++i) {
+        const unsigned char tc = skey[i];
         skey[i] = skey[skeylen - i - 1];
         skey[skeylen - i - 1] = tc;
     }

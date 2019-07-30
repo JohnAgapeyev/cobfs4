@@ -7,8 +7,8 @@ extern "C" {
 
 #include <openssl/evp.h>
 
-unsigned char *elligator2(EVP_PKEY *pkey);
-EVP_PKEY *elligator2_inv(unsigned char buffer[32]);
+int elligator2(const EVP_PKEY * const pkey, unsigned char out_elligator[static const 32]);
+EVP_PKEY *elligator2_inv(const unsigned char buffer[static const 32]);
 
 #if defined(__cplusplus)
 }
