@@ -16,6 +16,9 @@
 #define CLIENT_MIN_PAD_LEN 85
 #define CLIENT_MAX_PAD_LEN 8128
 
+//Normally decimal epoch hours are 6 digits, so this gives me leeway
+#define EPOCH_HOUR_LEN 8
+
 typedef enum {
     TYPE_PAYLOAD = 0,
     TYPE_PRNG_SEED = 1
@@ -24,8 +27,7 @@ typedef enum {
 struct client_request {
     uint8_t elligator[REPRESENTATIVE_LEN];
     uint8_t elligator_hmac[MARK_LEN];
-    //Normally decimal epoch hours are 6 digits, so this gives me leeway
-    uint8_t epoch_hours[8];
+    uint8_t epoch_hours[EPOCH_HOUR_LEN];
     uint8_t request_mac[MAC_LEN];
     uint8_t random_padding[CLIENT_MAX_PAD_LEN];
 };
@@ -35,7 +37,7 @@ struct server_response {
     uint8_t auth_tag[AUTH_LEN];
     uint8_t elligator_hmac[MARK_LEN];
     //Normally decimal epoch hours are 6 digits, so this gives me leeway
-    uint8_t epoch_hours[8];
+    uint8_t epoch_hours[EPOCH_HOUR_LEN];
     uint8_t request_mac[MAC_LEN];
     uint8_t random_padding[SERVER_MAX_PAD_LEN];
 };
@@ -48,7 +50,7 @@ struct data_packet {
     uint8_t data[];
 };
 
-int create_client_request(const EVP_PKEY *self_keypair,
+int create_client_request(const EVP_PKEY * const self_keypair,
         const uint8_t * const shared_knowledge,
         const size_t shared_len,
         struct client_request *out_req);

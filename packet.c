@@ -1,22 +1,61 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <limits.h>
 #include <openssl/evp.h>
 #include <openssl/crypto.h>
+#include <openssl/rand.h>
 #include "packet.h"
 #include "elligator.h"
 #include "hmac.h"
 
-int create_client_request(const EVP_PKEY *self_keypair,
+/*
+ * Modified from:
+ * https://stackoverflow.com/a/17554531
+ */
+uint64_t rand_interval(const uint64_t min, const uint64_t max) {
+    uint64_t r;
+    const uint64_t range = 1 + max - min;
+    const uint64_t buckets = UINT64_MAX / range;
+    const uint64_t limit = buckets * range;
+
+    /* Create equal size buckets all in a row, then fire randomly towards
+     * the buckets until you land in one of them. All buckets are equally
+     * likely. If you land off the end of the line of buckets, try again. */
+    do {
+        RAND_bytes((unsigned char *) &r, sizeof(r));
+    } while (r >= limit);
+
+    return min + (r / buckets);
+}
+
+int create_client_request(const EVP_PKEY * const self_keypair,
         const uint8_t * const shared_knowledge,
         const size_t shared_len,
         struct client_request *out_req) {
-    int res;
 
-    res = elligator2(self_keypair, out_req->elligator);
-    if (res) {
+    if (elligator2(self_keypair, out_req->elligator)) {
         goto error;
     }
+
+    const uint64_t padding_len = rand_interval(CLIENT_MIN_PAD_LEN, CLIENT_MAX_PAD_LEN);
+    uint8_t random_padding[CLIENT_MAX_PAD_LEN];
+    RAND_bytes(random_padding, padding_len);
+
+    memcpy(out_req->random_padding, random_padding, padding_len);
+
+    if (hmac_gen(shared_knowledge, shared_len, out_req->elligator, REPRESENTATIVE_LEN, out_req->elligator_hmac)) {
+        goto error;
+    }
+
+    //Get the number of hours since epoch
+    const uint64_t sec_time = time(NULL) / 3600;
+
+    if (snprintf((char *) out_req->epoch_hours, EPOCH_HOUR_LEN, "%lu", sec_time) < 0) {
+        goto error;
+    }
+
+    //Need to write hmac function for variadic messages
 
     return 0;
 
