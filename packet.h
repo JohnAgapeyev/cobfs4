@@ -6,6 +6,7 @@
 #define MAX_HANDSHAKE_SIZE 8192
 #define MARK_LEN 16
 #define MAC_LEN 16
+#define TAG_LEN 16
 #define REPRESENTATIVE_LEN 32
 #define AUTH_LEN 32
 #define INLINE_SEED_FRAME_LEN 45
@@ -36,7 +37,6 @@ struct server_response {
     uint8_t elligator[REPRESENTATIVE_LEN];
     uint8_t auth_tag[AUTH_LEN];
     uint8_t elligator_hmac[MARK_LEN];
-    //Normally decimal epoch hours are 6 digits, so this gives me leeway
     uint8_t epoch_hours[EPOCH_HOUR_LEN];
     uint8_t request_mac[MAC_LEN];
     uint8_t random_padding[SERVER_MAX_PAD_LEN];
@@ -44,7 +44,7 @@ struct server_response {
 
 struct data_packet {
     uint16_t frame_len;
-    uint8_t tag[16];
+    uint8_t tag[TAG_LEN];
     uint8_t type;
     uint16_t payload_len;
     uint8_t data[];

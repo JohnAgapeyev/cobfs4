@@ -51,11 +51,22 @@ int create_client_request(const EVP_PKEY * const self_keypair,
     //Get the number of hours since epoch
     const uint64_t sec_time = time(NULL) / 3600;
 
-    if (snprintf((char *) out_req->epoch_hours, EPOCH_HOUR_LEN, "%lu", sec_time) < 0) {
+    int real_hour_len;
+    if ((real_hour_len = snprintf((char *) out_req->epoch_hours, EPOCH_HOUR_LEN, "%lu%c", sec_time, '\0')) < 0) {
         goto error;
     }
 
-    //Need to write hmac function for variadic messages
+    uint8_t request_mac_data[REPRESENTATIVE_LEN + MARK_LEN + EPOCH_HOUR_LEN + CLIENT_MAX_PAD_LEN];
+    memcpy(request_mac_data, out_req->elligator, REPRESENTATIVE_LEN);
+    memcpy(request_mac_data + REPRESENTATIVE_LEN, out_req->random_padding, padding_len);
+    memcpy(request_mac_data + REPRESENTATIVE_LEN + padding_len, out_req->elligator_hmac, MARK_LEN);
+    memcpy(request_mac_data + REPRESENTATIVE_LEN + padding_len + MARK_LEN, out_req->epoch_hours, real_hour_len);
+
+    if (hmac_gen(shared_knowledge, shared_len, request_mac_data,
+                REPRESENTATIVE_LEN + padding_len + MARK_LEN + real_hour_len,
+                out_req->request_mac)) {
+        goto error;
+    }
 
     return 0;
 
