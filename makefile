@@ -4,7 +4,7 @@ RELEASEFLAGS=-s -O3 -march=native -flto -DNDEBUG
 CLIBS=-lcrypto
 EXEC=cobfs4
 DEPS=$(EXEC).d
-SRCS=elligator.c hmac.c packet.c
+SRCS=elligator.c hmac.c packet.c kdf.c
 TEST_SRCS=test_main.c test_elligator.c test_hmac.c
 HEADWILD=$(wildcard *.h)
 
