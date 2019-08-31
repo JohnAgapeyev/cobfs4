@@ -4,8 +4,8 @@ RELEASEFLAGS=-s -O3 -march=native -flto -DNDEBUG
 CLIBS=-lcrypto
 EXEC=cobfs4
 DEPS=$(EXEC).d
-SRCS=elligator.c hmac.c packet.c kdf.c
-TEST_SRCS=test_main.c test_elligator.c test_hmac.c
+SRCS=elligator.c hmac.c packet.c kdf.c ecdh.c hash.c
+TEST_SRCS=test_main.c test_elligator.c test_hmac.c test_ecdh.c
 HEADWILD=$(wildcard *.h)
 
 debug release: all
