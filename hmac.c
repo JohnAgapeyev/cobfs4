@@ -9,7 +9,7 @@ int hmac_gen(const unsigned char *key, const size_t key_len, const unsigned char
         const size_t mesg_len, unsigned char *hmac) {
     EVP_PKEY *pkey = NULL;
     EVP_MD_CTX *mdctx = NULL;
-    const EVP_MD *md = EVP_sha256();
+    const EVP_MD *md = EVP_sha512_256();
 
     unsigned char md_value[EVP_MAX_MD_SIZE];
     size_t md_len = 0;

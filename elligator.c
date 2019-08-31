@@ -15,8 +15,8 @@ int elligator2(const EVP_PKEY * const pkey, unsigned char out_elligator[static c
     BIGNUM *tmp2;
     BIGNUM *neg_one;
     BN_CTX *bnctx;
-    unsigned char *skey;
-    size_t skeylen;
+    unsigned char skey[32];
+    size_t skeylen = 32;
     EVP_PKEY_CTX *pctx;
 
     const unsigned long A = 486662;
@@ -72,13 +72,6 @@ int elligator2(const EVP_PKEY * const pkey, unsigned char out_elligator[static c
         goto free_tmp2;
     }
 
-    if (!EVP_PKEY_get_raw_public_key(pkey, NULL, &skeylen)) {
-        goto free_bignum_ctx;
-    }
-    skey = OPENSSL_malloc(skeylen);
-    if (!skey) {
-        goto free_bignum_ctx;
-    }
     if (!EVP_PKEY_get_raw_public_key(pkey, skey, &skeylen)) {
         goto error;
     }
@@ -343,8 +336,6 @@ int elligator2(const EVP_PKEY * const pkey, unsigned char out_elligator[static c
     return 0;
 
 error:
-    OPENSSL_free(skey);
-free_bignum_ctx:
     BN_CTX_free(bnctx);
 free_tmp2:
     BN_free(tmp2);
@@ -379,7 +370,7 @@ EVP_PKEY *elligator2_inv(const unsigned char buffer[static const 32]) {
     BIGNUM *neg_one;
     BIGNUM *p_minus_one;
     BN_CTX *bnctx;
-    unsigned char *skey;
+    unsigned char skey[32];
     EVP_PKEY_CTX *pctx;
     EVP_PKEY *pkey;
 
@@ -445,11 +436,6 @@ EVP_PKEY *elligator2_inv(const unsigned char buffer[static const 32]) {
     bnctx = BN_CTX_new();
     if (!bnctx) {
         goto free_tmp2;
-    }
-
-    skey = OPENSSL_malloc(skeylen);
-    if (!skey) {
-        goto free_bignum_ctx;
     }
 
     /* p = (2**255)-19 */
@@ -664,7 +650,6 @@ EVP_PKEY *elligator2_inv(const unsigned char buffer[static const 32]) {
         goto error;
     }
 
-    OPENSSL_free(skey);
     BN_CTX_free(bnctx);
     BN_free(tmp2);
     BN_free(tmp);
@@ -681,8 +666,6 @@ EVP_PKEY *elligator2_inv(const unsigned char buffer[static const 32]) {
     return pkey;
 
 error:
-    OPENSSL_free(skey);
-free_bignum_ctx:
     BN_CTX_free(bnctx);
 free_tmp2:
     BN_free(tmp2);
