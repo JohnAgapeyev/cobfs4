@@ -3,7 +3,7 @@
 #include <openssl/crypto.h>
 #include "hmac.h"
 
-#define HMAC_LEN 16
+#define HMAC_LEN 32
 
 int hmac_gen(const unsigned char *key, const size_t key_len, const unsigned char *message,
         const size_t mesg_len, unsigned char *hmac) {

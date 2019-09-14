@@ -4,8 +4,8 @@
 #include <stdint.h>
 
 #define MAX_HANDSHAKE_SIZE 8192
-#define MARK_LEN 16
-#define MAC_LEN 16
+#define MARK_LEN 32
+#define MAC_LEN 32
 #define TAG_LEN 16
 #define REPRESENTATIVE_LEN 32
 #define AUTH_LEN 32

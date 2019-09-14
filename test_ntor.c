@@ -19,9 +19,11 @@ void test_ntor(void) {
         EVP_PKEY *Y = ecdh_key_alloc();
 
         unsigned char client_tag[32];
+        unsigned char client_seed[32];
         unsigned char server_tag[32];
+        unsigned char server_seed[32];
 
-        if (server_ntor(Y, B, X, identity_digest, server_tag)) {
+        if (server_ntor(Y, B, X, identity_digest, server_tag, server_seed)) {
             ++bad;
             EVP_PKEY_free(B);
             EVP_PKEY_free(X);
@@ -29,7 +31,7 @@ void test_ntor(void) {
             continue;
         }
 
-        if (client_ntor(X, Y, B, identity_digest, client_tag)) {
+        if (client_ntor(X, Y, B, identity_digest, client_tag, client_seed)) {
             ++bad;
             EVP_PKEY_free(B);
             EVP_PKEY_free(X);
@@ -37,7 +39,7 @@ void test_ntor(void) {
             continue;
         }
 
-        if (memcmp(server_tag, client_tag, 32)) {
+        if (memcmp(server_tag, client_tag, 32) || memcmp(server_seed, client_seed, 32)) {
             ++bad;
             EVP_PKEY_free(B);
             EVP_PKEY_free(X);

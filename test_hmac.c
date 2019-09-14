@@ -12,7 +12,7 @@ void test_hmac(void) {
     unsigned char message[256];
     unsigned char mesg_len;
 
-    unsigned char hmac[16];
+    unsigned char hmac[32];
 
     int good = 0;
     int bad = 0;
