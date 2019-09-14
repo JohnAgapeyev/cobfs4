@@ -49,10 +49,10 @@ int create_client_request(const EVP_PKEY * const self_keypair,
     }
 
     //Get the number of hours since epoch
-    const uint64_t sec_time = time(NULL) / 3600;
+    const uint64_t hr_time = time(NULL) / 3600;
 
     int real_hour_len;
-    if ((real_hour_len = snprintf((char *) out_req->epoch_hours, EPOCH_HOUR_LEN, "%lu%c", sec_time, '\0')) < 0) {
+    if ((real_hour_len = snprintf((char *) out_req->epoch_hours, EPOCH_HOUR_LEN, "%lu%c", hr_time, '\0')) < 0) {
         goto error;
     }
 

@@ -1,6 +1,8 @@
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
 
+#include "kdf.h"
+
 int hkdf(const unsigned char * restrict mesg,
         size_t mesg_len,
         const unsigned char * restrict salt,
