@@ -6,13 +6,13 @@
 #include "test.h"
 
 void test_hmac(void) {
-    unsigned char key[256];
-    unsigned char key_len;
+    uint8_t key[256];
+    uint8_t key_len;
 
-    unsigned char message[256];
-    unsigned char mesg_len;
+    uint8_t message[256];
+    uint8_t mesg_len;
 
-    unsigned char hmac[32];
+    uint8_t hmac[32];
 
     int good = 0;
     int bad = 0;

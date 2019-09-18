@@ -15,9 +15,9 @@ static const char *t_verify = "ntor-curve25519-sha256-1:verify";
 int server_ntor(EVP_PKEY *ephem_keypair,
         EVP_PKEY *ntor_keypair,
         EVP_PKEY *remote_pubkey,
-        const unsigned char identity_digest[static const 32],
-        unsigned char out_auth[static const 32],
-        unsigned char out_keyseed[static const 32]) {
+        const uint8_t identity_digest[static 32],
+        uint8_t out_auth[static 32],
+        uint8_t out_keyseed[static 32]) {
 
     /*
      * Numbers are as follows:
@@ -26,9 +26,9 @@ int server_ntor(EVP_PKEY *ephem_keypair,
      * 3 public keys
      * and the protoid string
      */
-    unsigned char secret_input[32 + 32 + 32 + 32 + 32 + 32 + strlen(protoid)];
-    unsigned char verify[32];
-    unsigned char auth_input[(32 * 5) + strlen(protoid) + 6];
+    uint8_t secret_input[32 + 32 + 32 + 32 + 32 + 32 + strlen(protoid)];
+    uint8_t verify[32];
+    uint8_t auth_input[(32 * 5) + strlen(protoid) + 6];
 
     size_t tmp_len;
 
@@ -56,11 +56,11 @@ int server_ntor(EVP_PKEY *ephem_keypair,
 
     memcpy(secret_input + 192, protoid, strlen(protoid));
 
-    if (hmac_gen((const unsigned char *) t_key, strlen(t_key), secret_input, sizeof(secret_input), out_keyseed)) {
+    if (hmac_gen((const uint8_t *) t_key, strlen(t_key), secret_input, sizeof(secret_input), out_keyseed)) {
         goto error;
     }
 
-    if (hmac_gen((const unsigned char *) t_verify, strlen(t_verify), secret_input, sizeof(secret_input), verify)) {
+    if (hmac_gen((const uint8_t *) t_verify, strlen(t_verify), secret_input, sizeof(secret_input), verify)) {
         goto error;
     }
 
@@ -72,7 +72,7 @@ int server_ntor(EVP_PKEY *ephem_keypair,
     memcpy(auth_input + 144, protoid, strlen(protoid));
     memcpy(auth_input + 144 + strlen(protoid), "Server", 6);
 
-    if (hmac_gen((const unsigned char *) t_mac, strlen(t_mac), auth_input, sizeof(secret_input), out_auth)) {
+    if (hmac_gen((const uint8_t *) t_mac, strlen(t_mac), auth_input, sizeof(secret_input), out_auth)) {
         goto error;
     }
 
@@ -87,9 +87,9 @@ error:
 int client_ntor(EVP_PKEY *ephem_keypair,
         EVP_PKEY *remote_pubkey,
         EVP_PKEY *preshared_pubkey,
-        const unsigned char identity_digest[static const 32],
-        unsigned char out_auth[static const 32],
-        unsigned char out_keyseed[static const 32]) {
+        const uint8_t identity_digest[static 32],
+        uint8_t out_auth[static 32],
+        uint8_t out_keyseed[static 32]) {
     /*
      * Numbers are as follows:
      * 2 ecdh results
@@ -97,9 +97,9 @@ int client_ntor(EVP_PKEY *ephem_keypair,
      * 3 public keys
      * and the protoid string
      */
-    unsigned char secret_input[32 + 32 + 32 + 32 + 32 + 32 + strlen(protoid)];
-    unsigned char verify[32];
-    unsigned char auth_input[(32 * 5) + strlen(protoid) + 6];
+    uint8_t secret_input[32 + 32 + 32 + 32 + 32 + 32 + strlen(protoid)];
+    uint8_t verify[32];
+    uint8_t auth_input[(32 * 5) + strlen(protoid) + 6];
 
     size_t tmp_len;
 
@@ -127,11 +127,11 @@ int client_ntor(EVP_PKEY *ephem_keypair,
 
     memcpy(secret_input + 192, protoid, strlen(protoid));
 
-    if (hmac_gen((const unsigned char *) t_key, strlen(t_key), secret_input, sizeof(secret_input), out_keyseed)) {
+    if (hmac_gen((const uint8_t *) t_key, strlen(t_key), secret_input, sizeof(secret_input), out_keyseed)) {
         goto error;
     }
 
-    if (hmac_gen((const unsigned char *) t_verify, strlen(t_verify), secret_input, sizeof(secret_input), verify)) {
+    if (hmac_gen((const uint8_t *) t_verify, strlen(t_verify), secret_input, sizeof(secret_input), verify)) {
         goto error;
     }
 
@@ -143,7 +143,7 @@ int client_ntor(EVP_PKEY *ephem_keypair,
     memcpy(auth_input + 144, protoid, strlen(protoid));
     memcpy(auth_input + 144 + strlen(protoid), "Server", 6);
 
-    if (hmac_gen((const unsigned char *) t_mac, strlen(t_mac), auth_input, sizeof(secret_input), out_auth)) {
+    if (hmac_gen((const uint8_t *) t_mac, strlen(t_mac), auth_input, sizeof(secret_input), out_auth)) {
         goto error;
     }
 

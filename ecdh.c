@@ -37,9 +37,9 @@ EVP_PKEY *ecdh_key_alloc(void) {
     return pkey;
 }
 
-int ecdh_derive(EVP_PKEY *self_keypair, EVP_PKEY *remote_pub_key, unsigned char out_buffer[static 32]) {
+int ecdh_derive(EVP_PKEY *self_keypair, EVP_PKEY *remote_pub_key, uint8_t out_buffer[static 32]) {
     EVP_PKEY_CTX *ctx;
-    unsigned char skey[32];
+    uint8_t skey[32];
     size_t skeylen;
 
     ctx = EVP_PKEY_CTX_new(self_keypair, NULL);

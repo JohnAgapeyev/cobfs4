@@ -7,7 +7,7 @@
 #include "ecdh.h"
 
 //Stand-in for a real digest, since the value doesn't matter at all
-static const unsigned char *identity_digest = (const unsigned char *) "012345678901234567890123456789ab";
+static const uint8_t *identity_digest = (const uint8_t *) "012345678901234567890123456789ab";
 
 void test_ntor(void) {
     int good = 0;
@@ -18,10 +18,10 @@ void test_ntor(void) {
         EVP_PKEY *X = ecdh_key_alloc();
         EVP_PKEY *Y = ecdh_key_alloc();
 
-        unsigned char client_tag[32];
-        unsigned char client_seed[32];
-        unsigned char server_tag[32];
-        unsigned char server_seed[32];
+        uint8_t client_tag[32];
+        uint8_t client_seed[32];
+        uint8_t server_tag[32];
+        uint8_t server_seed[32];
 
         if (server_ntor(Y, B, X, identity_digest, server_tag, server_seed)) {
             ++bad;

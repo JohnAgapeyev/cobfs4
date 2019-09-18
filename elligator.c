@@ -5,7 +5,7 @@
 #include <openssl/err.h>
 #include "elligator.h"
 
-int elligator2(const EVP_PKEY * const pkey, unsigned char out_elligator[static const 32]) {
+int elligator2(const EVP_PKEY * const pkey, uint8_t out_elligator[static const 32]) {
     BIGNUM *r;
     BIGNUM *x;
     BIGNUM *y;
@@ -15,7 +15,7 @@ int elligator2(const EVP_PKEY * const pkey, unsigned char out_elligator[static c
     BIGNUM *tmp2;
     BIGNUM *neg_one;
     BN_CTX *bnctx;
-    unsigned char skey[32];
+    uint8_t skey[32];
     size_t skeylen = 32;
     EVP_PKEY_CTX *pctx;
 
@@ -103,7 +103,7 @@ int elligator2(const EVP_PKEY * const pkey, unsigned char out_elligator[static c
     }
 
     for (size_t i = 0; i < skeylen / 2 ; ++i) {
-        const unsigned char tc = skey[i];
+        const uint8_t tc = skey[i];
         skey[i] = skey[skeylen - i - 1];
         skey[skeylen - i - 1] = tc;
     }
@@ -358,7 +358,7 @@ free_pkey_ctx:
     return -1;
 }
 
-EVP_PKEY *elligator2_inv(const unsigned char buffer[static const 32]) {
+EVP_PKEY *elligator2_inv(const uint8_t buffer[static const 32]) {
     BIGNUM *r;
     BIGNUM *v;
     BIGNUM *e;
@@ -370,7 +370,7 @@ EVP_PKEY *elligator2_inv(const unsigned char buffer[static const 32]) {
     BIGNUM *neg_one;
     BIGNUM *p_minus_one;
     BN_CTX *bnctx;
-    unsigned char skey[32];
+    uint8_t skey[32];
     EVP_PKEY_CTX *pctx;
     EVP_PKEY *pkey;
 
@@ -641,7 +641,7 @@ EVP_PKEY *elligator2_inv(const unsigned char buffer[static const 32]) {
     }
 
     for (size_t i = 0; i < skeylen / 2 ; ++i) {
-        const unsigned char tc = skey[i];
+        const uint8_t tc = skey[i];
         skey[i] = skey[skeylen - i - 1];
         skey[skeylen - i - 1] = tc;
     }

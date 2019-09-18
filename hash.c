@@ -4,10 +4,10 @@
 
 #include "hash.h"
 
-int hash_data(unsigned char *mesg, size_t mesg_len, unsigned char out_buf[static 32]) {
+int hash_data(uint8_t *mesg, size_t mesg_len, uint8_t out_buf[static 32]) {
     EVP_MD_CTX *ctx = EVP_MD_CTX_new();
 
-    unsigned char digest[32];
+    uint8_t digest[32];
 
     if (!ctx) {
         return -1;

@@ -13,15 +13,15 @@ void test_elligator(void) {
     EVP_PKEY *peerkey;
     EVP_PKEY_CTX *pctx;
     size_t skeylen;
-    unsigned char *skey;
-    unsigned char *skey2;
+    uint8_t *skey;
+    uint8_t *skey2;
     int skey3;
     int count;
     int good;
     int bad;
     int invalid;
 
-    unsigned char elligator[32];
+    uint8_t elligator[32];
 
     /* size_t i; */
 
