@@ -32,15 +32,31 @@ static inline uint64_t rand_interval(const uint64_t min, const uint64_t max) {
     return min + (r / buckets);
 }
 
-static bool validate_client_mac(const struct client_request *req) {
-    (void)req;
+static bool validate_client_mac(const struct client_request *req,
+        EVP_PKEY *ntor_keypair,
+        const uint8_t identity_digest[static 32]) {
+    uint8_t mac_key[32 + 32];
+    size_t tmp_len = 32;
+    if (!EVP_PKEY_get_raw_public_key(ntor_keypair, mac_key, &tmp_len)) {
+        goto error;
+    }
+    memcpy(mac_key + 32, identity_digest, 32);
+
+    if (hmac_verify(mac_key, sizeof(mac_key), req->elligator, REPRESENTATIVE_LEN, req->elligator_hmac)) {
+        goto error;
+    }
+
+    //Verify the full packet hmac here
+
     return true;
+
+error:
+    return false;
 }
 
 int create_client_request(EVP_PKEY *self_keypair,
         EVP_PKEY *ntor_keypair,
         const uint8_t identity_digest[static 32],
-        const size_t shared_len,
         struct client_request *out_req) {
 
     if (elligator2(self_keypair, out_req->elligator)) {
@@ -50,7 +66,6 @@ int create_client_request(EVP_PKEY *self_keypair,
     out_req->padding_len = rand_interval(CLIENT_MIN_PAD_LEN, CLIENT_MAX_PAD_LEN);
     RAND_bytes(out_req->random_padding, out_req->padding_len);
 
-
     uint8_t shared_knowledge[32 + 32];
     size_t tmp_len = 32;
     if (!EVP_PKEY_get_raw_public_key(ntor_keypair, shared_knowledge, &tmp_len)) {
@@ -58,7 +73,7 @@ int create_client_request(EVP_PKEY *self_keypair,
     }
     memcpy(shared_knowledge + 32, identity_digest, 32);
 
-    if (hmac_gen(shared_knowledge, shared_len, out_req->elligator, REPRESENTATIVE_LEN, out_req->elligator_hmac)) {
+    if (hmac_gen(shared_knowledge, sizeof(shared_knowledge), out_req->elligator, REPRESENTATIVE_LEN, out_req->elligator_hmac)) {
         goto error;
     }
 
@@ -76,7 +91,7 @@ int create_client_request(EVP_PKEY *self_keypair,
     memcpy(request_mac_data + REPRESENTATIVE_LEN + out_req->padding_len, out_req->elligator_hmac, MARK_LEN);
     memcpy(request_mac_data + REPRESENTATIVE_LEN + out_req->padding_len + MARK_LEN, out_req->epoch_hours, real_hour_len);
 
-    if (hmac_gen(shared_knowledge, shared_len, request_mac_data,
+    if (hmac_gen(shared_knowledge, sizeof(shared_knowledge), request_mac_data,
                 REPRESENTATIVE_LEN + out_req->padding_len + MARK_LEN + real_hour_len,
                 out_req->request_mac)) {
         goto error;
@@ -93,7 +108,7 @@ int create_server_response(EVP_PKEY *ntor_keypair,
         const uint8_t identity_digest[static 32],
         const struct client_request *incoming_req,
         struct server_response *out_resp) {
-    if (!validate_client_mac(incoming_req)) {
+    if (!validate_client_mac(incoming_req, ntor_keypair, identity_digest)) {
         return -1;
     }
 

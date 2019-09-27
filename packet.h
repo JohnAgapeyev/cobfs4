@@ -17,8 +17,8 @@
 #define CLIENT_MIN_PAD_LEN 85
 #define CLIENT_MAX_PAD_LEN 8128
 
-//Normally decimal epoch hours are 6 digits, so this gives me leeway
-#define EPOCH_HOUR_LEN 8
+//Oh no, this will make my code break on January 29 2084
+#define EPOCH_HOUR_LEN 6
 
 typedef enum {
     TYPE_PAYLOAD = 0,
@@ -54,7 +54,6 @@ struct data_packet {
 int create_client_request(EVP_PKEY *self_keypair,
         EVP_PKEY *ntor_keypair,
         const uint8_t identity_digest[static 32],
-        const size_t shared_len,
         struct client_request *out_req);
 
 int create_server_response(EVP_PKEY *ntor_keypair,
