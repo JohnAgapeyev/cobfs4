@@ -5,7 +5,7 @@ CLIBS=-lcrypto
 EXEC=cobfs4
 DEPS=$(EXEC).d
 SRCS=elligator.c hmac.c packet.c kdf.c ecdh.c hash.c ntor.c
-TEST_SRCS=test_main.c test_elligator.c test_hmac.c test_ecdh.c test_ntor.c
+TEST_SRCS=test_main.c test_elligator.c test_hmac.c test_ecdh.c test_ntor.c test_packet.c
 HEADWILD=$(wildcard *.h)
 
 debug release: all

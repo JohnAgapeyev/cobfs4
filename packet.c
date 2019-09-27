@@ -38,7 +38,8 @@ static bool validate_client_mac(const struct client_request *req) {
 }
 
 int create_client_request(EVP_PKEY *self_keypair,
-        const uint8_t *shared_knowledge,
+        EVP_PKEY *ntor_keypair,
+        const uint8_t identity_digest[static 32],
         const size_t shared_len,
         struct client_request *out_req) {
 
@@ -48,6 +49,14 @@ int create_client_request(EVP_PKEY *self_keypair,
 
     out_req->padding_len = rand_interval(CLIENT_MIN_PAD_LEN, CLIENT_MAX_PAD_LEN);
     RAND_bytes(out_req->random_padding, out_req->padding_len);
+
+
+    uint8_t shared_knowledge[32 + 32];
+    size_t tmp_len = 32;
+    if (!EVP_PKEY_get_raw_public_key(ntor_keypair, shared_knowledge, &tmp_len)) {
+        goto error;
+    }
+    memcpy(shared_knowledge + 32, identity_digest, 32);
 
     if (hmac_gen(shared_knowledge, shared_len, out_req->elligator, REPRESENTATIVE_LEN, out_req->elligator_hmac)) {
         goto error;
@@ -123,8 +132,18 @@ int create_server_response(EVP_PKEY *ntor_keypair,
         goto error;
     }
 
-    //Generate response mac here
+    uint8_t packet_mac_data[REPRESENTATIVE_LEN + AUTH_LEN + SERVER_MAX_PAD_LEN + MAC_LEN + EPOCH_HOUR_LEN];
+    memcpy(packet_mac_data, out_resp->elligator, REPRESENTATIVE_LEN);
+    memcpy(packet_mac_data + REPRESENTATIVE_LEN, out_resp->auth_tag, AUTH_LEN);
+    memcpy(packet_mac_data + REPRESENTATIVE_LEN + AUTH_LEN, out_resp->random_padding, out_resp->padding_len);
+    memcpy(packet_mac_data + REPRESENTATIVE_LEN + AUTH_LEN + out_resp->padding_len,
+            out_resp->elligator_hmac, MAC_LEN);
+    memcpy(packet_mac_data + REPRESENTATIVE_LEN + AUTH_LEN + out_resp->padding_len + MAC_LEN,
+            incoming_req->epoch_hours, EPOCH_HOUR_LEN);
 
+    if (hmac_gen(response_mac_key, sizeof(response_mac_key), packet_mac_data, sizeof(packet_mac_data), out_resp->response_mac)) {
+        goto error;
+    }
 
     EVP_PKEY_free(ephem_key);
     return 0;

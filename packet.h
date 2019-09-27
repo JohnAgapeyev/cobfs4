@@ -52,7 +52,8 @@ struct data_packet {
 };
 
 int create_client_request(EVP_PKEY *self_keypair,
-        const uint8_t *shared_knowledge,
+        EVP_PKEY *ntor_keypair,
+        const uint8_t identity_digest[static 32],
         const size_t shared_len,
         struct client_request *out_req);
 
