@@ -46,7 +46,74 @@ static bool validate_client_mac(const struct client_request *req,
         goto error;
     }
 
-    //Verify the full packet hmac here
+    //Get the number of hours since epoch
+    const uint64_t hr_time = time(NULL) / 3600;
+
+    uint8_t packet_hmac_data[REPRESENTATIVE_LEN + MARK_LEN + EPOCH_HOUR_LEN + CLIENT_MAX_PAD_LEN];
+    memcpy(packet_hmac_data, req->elligator, REPRESENTATIVE_LEN);
+    memcpy(packet_hmac_data + REPRESENTATIVE_LEN, req->random_padding, req->padding_len);
+    memcpy(packet_hmac_data + REPRESENTATIVE_LEN + req->padding_len, req->elligator_hmac, MARK_LEN);
+    if (snprintf((char *) packet_hmac_data
+                    + REPRESENTATIVE_LEN + req->padding_len + MARK_LEN, EPOCH_HOUR_LEN,
+                    "%lu%c", hr_time, '\0') < 0) {
+        goto error;
+    }
+
+    //This is dumb but it (should) work
+    if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, sizeof(packet_hmac_data), req->request_mac)) {
+        if (snprintf((char *) packet_hmac_data
+                        + REPRESENTATIVE_LEN + req->padding_len + MARK_LEN, EPOCH_HOUR_LEN,
+                        "%lu%c", hr_time - 1, '\0') < 0) {
+            goto error;
+        }
+        if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, sizeof(packet_hmac_data), req->request_mac)) {
+            if (snprintf((char *) packet_hmac_data
+                            + REPRESENTATIVE_LEN + req->padding_len + MARK_LEN, EPOCH_HOUR_LEN,
+                            "%lu%c", hr_time + 1, '\0') < 0) {
+                goto error;
+            }
+            if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, sizeof(packet_hmac_data), req->request_mac)) {
+                goto error;
+            }
+        }
+    }
+
+    return true;
+
+error:
+    return false;
+}
+
+static bool validate_server_mac(const struct server_response *resp,
+        EVP_PKEY *ntor_keypair,
+        const uint8_t identity_digest[static 32]) {
+    uint8_t mac_key[32 + 32];
+    size_t tmp_len = 32;
+    if (!EVP_PKEY_get_raw_public_key(ntor_keypair, mac_key, &tmp_len)) {
+        goto error;
+    }
+    memcpy(mac_key + 32, identity_digest, 32);
+
+    if (hmac_verify(mac_key, sizeof(mac_key), resp->elligator, REPRESENTATIVE_LEN, resp->elligator_hmac)) {
+        goto error;
+    }
+
+    //Get the number of hours since epoch
+    const uint64_t hr_time = time(NULL) / 3600;
+
+    uint8_t packet_hmac_data[REPRESENTATIVE_LEN + MARK_LEN + EPOCH_HOUR_LEN + SERVER_MAX_PAD_LEN];
+    memcpy(packet_hmac_data, resp->elligator, REPRESENTATIVE_LEN);
+    memcpy(packet_hmac_data + REPRESENTATIVE_LEN, resp->random_padding, resp->padding_len);
+    memcpy(packet_hmac_data + REPRESENTATIVE_LEN + resp->padding_len, resp->elligator_hmac, MARK_LEN);
+    if (snprintf((char *) packet_hmac_data
+                    + REPRESENTATIVE_LEN + resp->padding_len + MARK_LEN, EPOCH_HOUR_LEN,
+                    "%lu%c", hr_time, '\0') < 0) {
+        goto error;
+    }
+
+    if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, sizeof(packet_hmac_data), resp->response_mac)) {
+        goto error;
+    }
 
     return true;
 
@@ -168,4 +235,8 @@ error:
     EVP_PKEY_free(client_pubkey);
     OPENSSL_cleanse(out_resp, sizeof(*out_resp));
     return -1;
+}
+
+int client_process_server_response() {
+    return 0;
 }
