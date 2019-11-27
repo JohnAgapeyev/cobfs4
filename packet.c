@@ -12,6 +12,18 @@
 #include "ecdh.h"
 #include "ntor.h"
 
+static inline void dump_hex(const uint8_t *data, size_t len) {
+    (void)data;
+    (void)len;
+#if 0
+    printf("Dumping:\n");
+    for (size_t i = 0; i < len; ++i) {
+        printf("%02x", data[i]);
+    }
+    printf("\n");
+#endif
+}
+
 /*
  * Modified from:
  * https://stackoverflow.com/a/17554531
@@ -37,6 +49,7 @@ static bool validate_client_mac(const struct client_request *req,
         const uint8_t identity_digest[static 32]) {
     uint8_t mac_key[32 + 32];
     size_t tmp_len = 32;
+
     if (!EVP_PKEY_get_raw_public_key(ntor_keypair, mac_key, &tmp_len)) {
         goto error;
     }
@@ -48,31 +61,38 @@ static bool validate_client_mac(const struct client_request *req,
 
     //Get the number of hours since epoch
     const uint64_t hr_time = time(NULL) / 3600;
+    int real_hour_len;
 
     uint8_t packet_hmac_data[REPRESENTATIVE_LEN + MARK_LEN + EPOCH_HOUR_LEN + CLIENT_MAX_PAD_LEN];
     memcpy(packet_hmac_data, req->elligator, REPRESENTATIVE_LEN);
     memcpy(packet_hmac_data + REPRESENTATIVE_LEN, req->random_padding, req->padding_len);
     memcpy(packet_hmac_data + REPRESENTATIVE_LEN + req->padding_len, req->elligator_hmac, MARK_LEN);
-    if (snprintf((char *) packet_hmac_data
+    if ((real_hour_len = snprintf((char *) packet_hmac_data
                     + REPRESENTATIVE_LEN + req->padding_len + MARK_LEN, EPOCH_HOUR_LEN,
-                    "%lu%c", hr_time, '\0') < 0) {
+                    "%lu%c", hr_time, '\0')) < 0) {
         goto error;
     }
 
+    size_t hmac_data_len = REPRESENTATIVE_LEN + req->padding_len + MARK_LEN + real_hour_len - 1;
+
+    //dump_hex(packet_hmac_data, hmac_data_len);
+
     //This is dumb but it (should) work
-    if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, sizeof(packet_hmac_data), req->request_mac)) {
-        if (snprintf((char *) packet_hmac_data
+    if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac)) {
+        if ((real_hour_len = snprintf((char *) packet_hmac_data
                         + REPRESENTATIVE_LEN + req->padding_len + MARK_LEN, EPOCH_HOUR_LEN,
-                        "%lu%c", hr_time - 1, '\0') < 0) {
+                        "%lu%c", hr_time - 1, '\0')) < 0) {
             goto error;
         }
-        if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, sizeof(packet_hmac_data), req->request_mac)) {
-            if (snprintf((char *) packet_hmac_data
+        hmac_data_len = REPRESENTATIVE_LEN + req->padding_len + MARK_LEN + real_hour_len - 1;
+        if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac)) {
+            if ((real_hour_len = snprintf((char *) packet_hmac_data
                             + REPRESENTATIVE_LEN + req->padding_len + MARK_LEN, EPOCH_HOUR_LEN,
-                            "%lu%c", hr_time + 1, '\0') < 0) {
+                            "%lu%c", hr_time + 1, '\0')) < 0) {
                 goto error;
             }
-            if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, sizeof(packet_hmac_data), req->request_mac)) {
+            hmac_data_len = REPRESENTATIVE_LEN + req->padding_len + MARK_LEN + real_hour_len - 1;
+            if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac)) {
                 goto error;
             }
         }
@@ -98,20 +118,18 @@ static bool validate_server_mac(const struct server_response *resp,
         goto error;
     }
 
-    //Get the number of hours since epoch
-    const uint64_t hr_time = time(NULL) / 3600;
-
-    uint8_t packet_hmac_data[REPRESENTATIVE_LEN + MARK_LEN + EPOCH_HOUR_LEN + SERVER_MAX_PAD_LEN];
+    uint8_t packet_hmac_data[REPRESENTATIVE_LEN + AUTH_LEN + MARK_LEN + EPOCH_HOUR_LEN + SERVER_MAX_PAD_LEN];
     memcpy(packet_hmac_data, resp->elligator, REPRESENTATIVE_LEN);
-    memcpy(packet_hmac_data + REPRESENTATIVE_LEN, resp->random_padding, resp->padding_len);
-    memcpy(packet_hmac_data + REPRESENTATIVE_LEN + resp->padding_len, resp->elligator_hmac, MARK_LEN);
-    if (snprintf((char *) packet_hmac_data
-                    + REPRESENTATIVE_LEN + resp->padding_len + MARK_LEN, EPOCH_HOUR_LEN,
-                    "%lu%c", hr_time, '\0') < 0) {
-        goto error;
-    }
+    memcpy(packet_hmac_data + REPRESENTATIVE_LEN, resp->auth_tag, AUTH_LEN);
+    memcpy(packet_hmac_data + REPRESENTATIVE_LEN + AUTH_LEN, resp->random_padding, resp->padding_len);
+    memcpy(packet_hmac_data + REPRESENTATIVE_LEN + AUTH_LEN + resp->padding_len, resp->elligator_hmac, MARK_LEN);
 
-    if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, sizeof(packet_hmac_data), resp->response_mac)) {
+    size_t hmac_data_len = REPRESENTATIVE_LEN + AUTH_LEN + resp->padding_len + MAC_LEN;
+
+    dump_hex(packet_hmac_data, hmac_data_len);
+
+    if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data,
+            hmac_data_len, resp->response_mac)) {
         goto error;
     }
 
@@ -158,8 +176,12 @@ int create_client_request(EVP_PKEY *self_keypair,
     memcpy(request_mac_data + REPRESENTATIVE_LEN + out_req->padding_len, out_req->elligator_hmac, MARK_LEN);
     memcpy(request_mac_data + REPRESENTATIVE_LEN + out_req->padding_len + MARK_LEN, out_req->epoch_hours, real_hour_len);
 
+    const size_t hmac_data_len = REPRESENTATIVE_LEN + out_req->padding_len + MARK_LEN + real_hour_len - 1;
+
+    //dump_hex(request_mac_data, hmac_data_len);
+
     if (hmac_gen(shared_knowledge, sizeof(shared_knowledge), request_mac_data,
-                REPRESENTATIVE_LEN + out_req->padding_len + MARK_LEN + real_hour_len,
+                hmac_data_len,
                 out_req->request_mac)) {
         goto error;
     }
@@ -174,22 +196,34 @@ error:
 int create_server_response(EVP_PKEY *ntor_keypair,
         const uint8_t identity_digest[static 32],
         const struct client_request *incoming_req,
-        struct server_response *out_resp) {
+        struct server_response *out_resp,
+        uint8_t *out_auth,
+        uint8_t *out_seed) {
+    EVP_PKEY *client_pubkey = NULL;
+    uint8_t key_seed[32];
+    EVP_PKEY *ephem_key = NULL;
+    uint8_t response_mac_key[32 + 32];
+    size_t tmp_len = 32;
+    uint8_t packet_mac_data[REPRESENTATIVE_LEN + AUTH_LEN + SERVER_MAX_PAD_LEN + MAC_LEN + EPOCH_HOUR_LEN];
+
     if (!validate_client_mac(incoming_req, ntor_keypair, identity_digest)) {
         return -1;
     }
 
-    uint8_t key_seed[32];
-    EVP_PKEY *ephem_key = ecdh_key_alloc();
+    ephem_key = ecdh_key_alloc();
     if (!ephem_key) {
         return -1;
     }
 
-    if (elligator2(ephem_key, out_resp->elligator)) {
-        goto error;
+    while(elligator2(ephem_key, out_resp->elligator) == -1) {
+        EVP_PKEY_free(ephem_key);
+        ephem_key = ecdh_key_alloc();
+        if (ephem_key == NULL) {
+            goto error;
+        }
     }
 
-    EVP_PKEY *client_pubkey = elligator2_inv(incoming_req->elligator);
+    client_pubkey = elligator2_inv(incoming_req->elligator);
     if (!client_pubkey) {
         goto error;
     }
@@ -201,20 +235,16 @@ int create_server_response(EVP_PKEY *ntor_keypair,
     out_resp->padding_len = rand_interval(SERVER_MIN_PAD_LEN, SERVER_MAX_PAD_LEN);
     RAND_bytes(out_resp->random_padding, out_resp->padding_len);
 
-    uint8_t response_mac_key[32 + 32];
-
-    size_t tmp_len = 32;
     if (!EVP_PKEY_get_raw_public_key(ntor_keypair, response_mac_key, &tmp_len)) {
         goto error;
     }
 
-    memcpy(response_mac_key + 32, out_resp->elligator, 32);
+    memcpy(response_mac_key + 32, identity_digest, 32);
 
     if (hmac_gen(response_mac_key, sizeof(response_mac_key), out_resp->elligator, 32, out_resp->elligator_hmac)) {
         goto error;
     }
 
-    uint8_t packet_mac_data[REPRESENTATIVE_LEN + AUTH_LEN + SERVER_MAX_PAD_LEN + MAC_LEN + EPOCH_HOUR_LEN];
     memcpy(packet_mac_data, out_resp->elligator, REPRESENTATIVE_LEN);
     memcpy(packet_mac_data + REPRESENTATIVE_LEN, out_resp->auth_tag, AUTH_LEN);
     memcpy(packet_mac_data + REPRESENTATIVE_LEN + AUTH_LEN, out_resp->random_padding, out_resp->padding_len);
@@ -223,9 +253,16 @@ int create_server_response(EVP_PKEY *ntor_keypair,
     memcpy(packet_mac_data + REPRESENTATIVE_LEN + AUTH_LEN + out_resp->padding_len + MAC_LEN,
             incoming_req->epoch_hours, EPOCH_HOUR_LEN);
 
-    if (hmac_gen(response_mac_key, sizeof(response_mac_key), packet_mac_data, sizeof(packet_mac_data), out_resp->response_mac)) {
+    size_t packet_hmac_len = REPRESENTATIVE_LEN + AUTH_LEN + out_resp->padding_len + MAC_LEN;
+
+    dump_hex(packet_mac_data, packet_hmac_len);
+
+    if (hmac_gen(response_mac_key, sizeof(response_mac_key), packet_mac_data, packet_hmac_len, out_resp->response_mac)) {
         goto error;
     }
+
+    memcpy(out_auth, out_resp->auth_tag, sizeof(out_resp->auth_tag));
+    memcpy(out_seed, key_seed, sizeof(key_seed));
 
     EVP_PKEY_free(ephem_key);
     return 0;
@@ -237,6 +274,36 @@ error:
     return -1;
 }
 
-int client_process_server_response() {
+int client_process_server_response(EVP_PKEY *self_keypair,
+        EVP_PKEY *ntor_keypair,
+        const uint8_t identity_digest[static 32],
+        struct server_response *resp,
+        uint8_t *out_auth,
+        uint8_t *out_seed) {
+    uint8_t auth_tag[32];
+    uint8_t key_seed[32];
+
+    if (!validate_server_mac(resp, ntor_keypair, identity_digest)) {
+        return -1;
+    }
+
+    EVP_PKEY *server_pubkey = elligator2_inv(resp->elligator);
+    if (server_pubkey == NULL) {
+        return -1;
+    }
+
+    if (client_ntor(self_keypair, server_pubkey, ntor_keypair, identity_digest, auth_tag, key_seed) == -1) {
+        EVP_PKEY_free(server_pubkey);
+        return -1;
+    }
+
+    if (CRYPTO_memcmp(auth_tag, resp->auth_tag, sizeof(auth_tag)) != 0) {
+        EVP_PKEY_free(server_pubkey);
+        return -1;
+    }
+
+    memcpy(out_auth, auth_tag, sizeof(auth_tag));
+    memcpy(out_seed, key_seed, sizeof(key_seed));
+
     return 0;
 }

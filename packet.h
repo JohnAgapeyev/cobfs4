@@ -59,9 +59,15 @@ int create_client_request(EVP_PKEY *self_keypair,
 int create_server_response(EVP_PKEY *ntor_keypair,
         const uint8_t identity_digest[static 32],
         const struct client_request *incoming_req,
-        struct server_response *out_resp);
+        struct server_response *out_resp,
+        uint8_t *out_auth,
+        uint8_t *out_seed);
 
-int client_process_server_response(EVP_PKEY *ntor_keypair, const uint8_t identity_digest[static 32],
-        struct server_response *resp);
+int client_process_server_response(EVP_PKEY *self_keypair,
+        EVP_PKEY *ntor_keypair,
+        const uint8_t identity_digest[static 32],
+        struct server_response *resp,
+        uint8_t *out_auth,
+        uint8_t *out_seed);
 
 #endif /* COBFS4_PACKET */

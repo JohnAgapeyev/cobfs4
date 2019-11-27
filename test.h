@@ -5,5 +5,6 @@ void test_elligator(void);
 void test_hmac(void);
 void test_ecdh(void);
 void test_ntor(void);
+void test_handshake(void);
 
 #endif /* COBFS4_TEST_HEADER */

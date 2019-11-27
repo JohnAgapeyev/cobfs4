@@ -6,5 +6,6 @@ int main(void) {
     test_hmac();
     test_ecdh();
     test_ntor();
+    test_handshake();
     return 0;
 }
