@@ -63,35 +63,35 @@ static bool validate_client_mac(const struct client_request *req,
     const uint64_t hr_time = time(NULL) / 3600;
     int real_hour_len;
 
-    uint8_t packet_hmac_data[REPRESENTATIVE_LEN + MARK_LEN + EPOCH_HOUR_LEN + CLIENT_MAX_PAD_LEN];
+    uint8_t packet_hmac_data[REPRESENTATIVE_LEN + MARK_LEN + EPOCH_HOUR_LEN + CLIENT_MAX_PAD_LEN + 1];
     memcpy(packet_hmac_data, req->elligator, REPRESENTATIVE_LEN);
     memcpy(packet_hmac_data + REPRESENTATIVE_LEN, req->random_padding, req->padding_len);
     memcpy(packet_hmac_data + REPRESENTATIVE_LEN + req->padding_len, req->elligator_hmac, MARK_LEN);
     if ((real_hour_len = snprintf((char *) packet_hmac_data
                     + REPRESENTATIVE_LEN + req->padding_len + MARK_LEN, EPOCH_HOUR_LEN,
-                    "%lu%c", hr_time, '\0')) < 0) {
+                    "%lu", hr_time)) < 0) {
         goto error;
     }
 
-    size_t hmac_data_len = REPRESENTATIVE_LEN + req->padding_len + MARK_LEN + real_hour_len - 1;
+    size_t hmac_data_len = REPRESENTATIVE_LEN + req->padding_len + MARK_LEN + real_hour_len;
 
     //dump_hex(packet_hmac_data, hmac_data_len);
 
-    //This is dumb but it (should) work
+    //This is dumb but it works
     if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac)) {
         if ((real_hour_len = snprintf((char *) packet_hmac_data
                         + REPRESENTATIVE_LEN + req->padding_len + MARK_LEN, EPOCH_HOUR_LEN,
-                        "%lu%c", hr_time - 1, '\0')) < 0) {
+                        "%lu", hr_time - 1)) < 0) {
             goto error;
         }
-        hmac_data_len = REPRESENTATIVE_LEN + req->padding_len + MARK_LEN + real_hour_len - 1;
+        hmac_data_len = REPRESENTATIVE_LEN + req->padding_len + MARK_LEN + real_hour_len;
         if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac)) {
             if ((real_hour_len = snprintf((char *) packet_hmac_data
                             + REPRESENTATIVE_LEN + req->padding_len + MARK_LEN, EPOCH_HOUR_LEN,
-                            "%lu%c", hr_time + 1, '\0')) < 0) {
+                            "%lu", hr_time + 1)) < 0) {
                 goto error;
             }
-            hmac_data_len = REPRESENTATIVE_LEN + req->padding_len + MARK_LEN + real_hour_len - 1;
+            hmac_data_len = REPRESENTATIVE_LEN + req->padding_len + MARK_LEN + real_hour_len;
             if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac)) {
                 goto error;
             }
@@ -166,7 +166,7 @@ int create_client_request(EVP_PKEY *self_keypair,
     const uint64_t hr_time = time(NULL) / 3600;
 
     int real_hour_len;
-    if ((real_hour_len = snprintf((char *) out_req->epoch_hours, EPOCH_HOUR_LEN, "%lu%c", hr_time, '\0')) < 0) {
+    if ((real_hour_len = snprintf((char *) out_req->epoch_hours, EPOCH_HOUR_LEN, "%lu", hr_time)) < 0) {
         goto error;
     }
 
@@ -176,7 +176,7 @@ int create_client_request(EVP_PKEY *self_keypair,
     memcpy(request_mac_data + REPRESENTATIVE_LEN + out_req->padding_len, out_req->elligator_hmac, MARK_LEN);
     memcpy(request_mac_data + REPRESENTATIVE_LEN + out_req->padding_len + MARK_LEN, out_req->epoch_hours, real_hour_len);
 
-    const size_t hmac_data_len = REPRESENTATIVE_LEN + out_req->padding_len + MARK_LEN + real_hour_len - 1;
+    const size_t hmac_data_len = REPRESENTATIVE_LEN + out_req->padding_len + MARK_LEN + real_hour_len;
 
     //dump_hex(request_mac_data, hmac_data_len);
 
