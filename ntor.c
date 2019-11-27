@@ -55,13 +55,14 @@ int server_ntor(EVP_PKEY *ephem_keypair,
     }
 
     memcpy(secret_input + 192, protoid, strlen(protoid));
-    secret_input[192 + strlen(protoid)] = '\0';
 
-    if (hmac_gen((const uint8_t *) t_key, strlen(t_key), secret_input, strlen((char *) secret_input), out_keyseed)) {
+    size_t secret_len = 192 + strlen(protoid);
+
+    if (hmac_gen((const uint8_t *) t_key, strlen(t_key), secret_input, secret_len, out_keyseed)) {
         goto error;
     }
 
-    if (hmac_gen((const uint8_t *) t_verify, strlen(t_verify), secret_input, strlen((char *) secret_input), verify)) {
+    if (hmac_gen((const uint8_t *) t_verify, strlen(t_verify), secret_input, secret_len, verify)) {
         goto error;
     }
 
@@ -72,9 +73,10 @@ int server_ntor(EVP_PKEY *ephem_keypair,
     memcpy(auth_input + 112, secret_input + 128, 32);
     memcpy(auth_input + 144, protoid, strlen(protoid));
     memcpy(auth_input + 144 + strlen(protoid), "Server", 6);
-    auth_input[144 + strlen(protoid) + 6] = '\0';
 
-    if (hmac_gen((const uint8_t *) t_mac, strlen(t_mac), auth_input, strlen((char *) auth_input), out_auth)) {
+    size_t auth_len = 144 + strlen(protoid) + 6;
+
+    if (hmac_gen((const uint8_t *) t_mac, strlen(t_mac), auth_input, auth_len, out_auth)) {
         goto error;
     }
 
@@ -128,13 +130,14 @@ int client_ntor(EVP_PKEY *ephem_keypair,
     }
 
     memcpy(secret_input + 192, protoid, strlen(protoid));
-    secret_input[192 + strlen(protoid)] = '\0';
 
-    if (hmac_gen((const uint8_t *) t_key, strlen(t_key), secret_input, strlen((char *) secret_input), out_keyseed)) {
+    size_t secret_len = 192 + strlen(protoid);
+
+    if (hmac_gen((const uint8_t *) t_key, strlen(t_key), secret_input, secret_len, out_keyseed)) {
         goto error;
     }
 
-    if (hmac_gen((const uint8_t *) t_verify, strlen(t_verify), secret_input, strlen((char *) secret_input), verify)) {
+    if (hmac_gen((const uint8_t *) t_verify, strlen(t_verify), secret_input, secret_len, verify)) {
         goto error;
     }
 
@@ -145,9 +148,10 @@ int client_ntor(EVP_PKEY *ephem_keypair,
     memcpy(auth_input + 112, secret_input + 128, 32);
     memcpy(auth_input + 144, protoid, strlen(protoid));
     memcpy(auth_input + 144 + strlen(protoid), "Server", 6);
-    auth_input[144 + strlen(protoid) + 6] = '\0';
 
-    if (hmac_gen((const uint8_t *) t_mac, strlen(t_mac), auth_input, strlen((char *) auth_input), out_auth)) {
+    size_t auth_len = 144 + strlen(protoid) + 6;
+
+    if (hmac_gen((const uint8_t *) t_mac, strlen(t_mac), auth_input, auth_len, out_auth)) {
         goto error;
     }
 
