@@ -102,13 +102,7 @@ int elligator2(const EVP_PKEY * const pkey, uint8_t out_elligator[static const 3
         goto error;
     }
 
-    for (size_t i = 0; i < skeylen / 2 ; ++i) {
-        const uint8_t tc = skey[i];
-        skey[i] = skey[skeylen - i - 1];
-        skey[skeylen - i - 1] = tc;
-    }
-
-    if (!BN_bin2bn(skey, skeylen, x)) {
+    if (!BN_lebin2bn(skey, skeylen, x)) {
         goto error;
     }
     if (!BN_mod(x, x, p, bnctx)) {
@@ -635,16 +629,10 @@ EVP_PKEY *elligator2_inv(const uint8_t buffer[static const 32]) {
         goto error;
     }
 
-    memset(skey, 0, skeylen);
-    if (!BN_bn2bin(x, skey + (skeylen - BN_num_bytes(x)))) {
+    if (!BN_bn2lebinpad(x, skey, skeylen)) {
         goto error;
     }
 
-    for (size_t i = 0; i < skeylen / 2 ; ++i) {
-        const uint8_t tc = skey[i];
-        skey[i] = skey[skeylen - i - 1];
-        skey[skeylen - i - 1] = tc;
-    }
     pkey = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519, NULL, skey, skeylen);
     if (!pkey) {
         goto error;
