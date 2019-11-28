@@ -5,6 +5,8 @@
 #include <openssl/err.h>
 #include "elligator.h"
 
+static const char *X25519_PRIME = "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffed";
+
 int elligator2(const EVP_PKEY * const pkey, uint8_t out_elligator[static const 32]) {
     BIGNUM *r;
     BIGNUM *x;
@@ -77,16 +79,7 @@ int elligator2(const EVP_PKEY * const pkey, uint8_t out_elligator[static const 3
     }
 
     /* p = (2**255)-19 */
-    if (!BN_set_word(p, 2)) {
-        goto error;
-    }
-    if (!BN_set_word(tmp, 255)) {
-        goto error;
-    }
-    if (!BN_exp(p, p, tmp, bnctx)) {
-        goto error;
-    }
-    if (!BN_sub_word(p, 19)) {
+    if (!BN_hex2bn(&p, X25519_PRIME)) {
         goto error;
     }
 
@@ -433,16 +426,7 @@ EVP_PKEY *elligator2_inv(const uint8_t buffer[static const 32]) {
     }
 
     /* p = (2**255)-19 */
-    if (!BN_set_word(p, 2)) {
-        goto error;
-    }
-    if (!BN_set_word(tmp, 255)) {
-        goto error;
-    }
-    if (!BN_exp(p, p, tmp, bnctx)) {
-        goto error;
-    }
-    if (!BN_sub_word(p, 19)) {
+    if (!BN_hex2bn(&p, X25519_PRIME)) {
         goto error;
     }
 

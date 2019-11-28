@@ -28,7 +28,7 @@ typedef enum {
 struct client_request {
     uint8_t elligator[REPRESENTATIVE_LEN];
     uint8_t elligator_hmac[MARK_LEN];
-    uint8_t epoch_hours[EPOCH_HOUR_LEN];
+    uint8_t epoch_hours[EPOCH_HOUR_LEN + 1]; //Add room for null from snprintf
     uint8_t request_mac[MAC_LEN];
     uint64_t padding_len;
     uint8_t random_padding[CLIENT_MAX_PAD_LEN];
