@@ -3,6 +3,7 @@
 
 #include "cobfs4.h"
 #include "hmac.h"
+#include "constants.h"
 #include "test.h"
 
 void test_hmac(void) {
@@ -12,7 +13,7 @@ void test_hmac(void) {
     uint8_t message[256];
     uint8_t mesg_len;
 
-    uint8_t hmac[32];
+    uint8_t hmac[COBFS4_HMAC_LEN];
 
     int good = 0;
     int bad = 0;

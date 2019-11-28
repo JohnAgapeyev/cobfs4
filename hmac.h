@@ -1,15 +1,14 @@
 #ifndef COBFS4_HMAC
 #define COBFS4_HMAC
 
-/*
- * hmac must be at least 16 bytes
- */
-int hmac_gen(const uint8_t *key, const size_t key_len,
-        const uint8_t *message, const size_t mesg_len,
-        uint8_t *hmac);
+#include "constants.h"
 
-int hmac_verify(const uint8_t *key, const size_t key_len,
-        const uint8_t *message, const size_t mesg_len,
-        const uint8_t *hmac);
+int hmac_gen(const uint8_t * restrict key, const size_t key_len,
+        const uint8_t * restrict message, const size_t mesg_len,
+        uint8_t hmac[static restrict COBFS4_HMAC_LEN]);
+
+int hmac_verify(const uint8_t * restrict key, const size_t key_len,
+        const uint8_t * restrict message, const size_t mesg_len,
+        const uint8_t hmac[static restrict COBFS4_HMAC_LEN]);
 
 #endif /* COBFS4_HMAC */

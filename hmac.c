@@ -1,12 +1,12 @@
 #include <string.h>
 #include <openssl/evp.h>
 #include <openssl/crypto.h>
+#include "constants.h"
 #include "hmac.h"
 
-#define COBFS4_HMAC_LEN 32
-
-int hmac_gen(const uint8_t *key, const size_t key_len, const uint8_t *message,
-        const size_t mesg_len, uint8_t *hmac) {
+int hmac_gen(const uint8_t * restrict key, const size_t key_len,
+        const uint8_t * restrict message, const size_t mesg_len,
+        uint8_t hmac[static restrict COBFS4_HMAC_LEN]) {
     const EVP_MD *md = EVP_sha512_256();
     EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
     if (!mdctx) {
@@ -51,8 +51,9 @@ free_md_ctx:
     return -1;
 }
 
-int hmac_verify(const uint8_t* key, const size_t key_len, const uint8_t* message,
-        const size_t mesg_len, const uint8_t* hmac) {
+int hmac_verify(const uint8_t * restrict key, const size_t key_len,
+        const uint8_t * restrict message, const size_t mesg_len,
+        const uint8_t hmac[static restrict COBFS4_HMAC_LEN]) {
     uint8_t genned_hmac[COBFS4_HMAC_LEN];
 
     if (hmac_gen(key, key_len, message, mesg_len, genned_hmac)) {

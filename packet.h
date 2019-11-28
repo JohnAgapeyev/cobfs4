@@ -36,23 +36,23 @@ struct data_packet {
     uint8_t data[];
 };
 
-int create_client_request(EVP_PKEY *self_keypair,
-        EVP_PKEY *ntor_keypair,
-        const uint8_t identity_digest[static 32],
-        struct client_request *out_req);
+int create_client_request(EVP_PKEY * restrict self_keypair,
+        EVP_PKEY * restrict ntor_keypair,
+        const uint8_t identity_digest[static restrict COBFS4_HASH_LEN],
+        struct client_request * restrict out_req);
 
-int create_server_response(EVP_PKEY *ntor_keypair,
-        const uint8_t identity_digest[static 32],
-        const struct client_request *incoming_req,
-        struct server_response *out_resp,
-        uint8_t *out_auth,
-        uint8_t *out_seed);
+int create_server_response(EVP_PKEY *  restrict ntor_keypair,
+        const uint8_t identity_digest[static restrict COBFS4_HASH_LEN],
+        const struct client_request * restrict incoming_req,
+        struct server_response * restrict out_resp,
+        uint8_t out_auth[static restrict COBFS4_AUTH_LEN],
+        uint8_t out_seed[static restrict COBFS4_SEED_LEN]);
 
-int client_process_server_response(EVP_PKEY *self_keypair,
-        EVP_PKEY *ntor_keypair,
-        const uint8_t identity_digest[static 32],
-        struct server_response *resp,
-        uint8_t *out_auth,
-        uint8_t *out_seed);
+int client_process_server_response(EVP_PKEY * restrict self_keypair,
+        EVP_PKEY * restrict ntor_keypair,
+        const uint8_t identity_digest[static COBFS4_HASH_LEN],
+        struct server_response * restrict resp,
+        uint8_t out_auth[static restrict COBFS4_AUTH_LEN],
+        uint8_t out_seed[static restrict COBFS4_SEED_LEN]);
 
 #endif /* COBFS4_PACKET */
