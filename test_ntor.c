@@ -23,7 +23,7 @@ void test_ntor(void) {
         uint8_t server_tag[32];
         uint8_t server_seed[32];
 
-        if (server_ntor(Y, B, X, identity_digest, server_tag, server_seed)) {
+        if (server_ntor(Y, X, B, identity_digest, server_tag, server_seed)) {
             ++bad;
             EVP_PKEY_free(B);
             EVP_PKEY_free(X);

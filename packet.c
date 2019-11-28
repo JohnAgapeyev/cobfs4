@@ -237,7 +237,7 @@ int create_server_response(EVP_PKEY *  restrict ntor_keypair,
         goto error;
     }
 
-    if (server_ntor(ephem_key, ntor_keypair, client_pubkey, identity_digest, out_resp->auth_tag, out_seed)) {
+    if (server_ntor(ephem_key, client_pubkey, ntor_keypair, identity_digest, out_resp->auth_tag, out_seed)) {
         goto error;
     }
 
