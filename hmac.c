@@ -3,7 +3,7 @@
 #include <openssl/crypto.h>
 #include "hmac.h"
 
-#define HMAC_LEN 32
+#define COBFS4_HMAC_LEN 32
 
 int hmac_gen(const uint8_t *key, const size_t key_len, const uint8_t *message,
         const size_t mesg_len, uint8_t *hmac) {
@@ -33,11 +33,11 @@ int hmac_gen(const uint8_t *key, const size_t key_len, const uint8_t *message,
         goto error;
     }
 
-    if (md_len < HMAC_LEN) {
+    if (md_len < COBFS4_HMAC_LEN) {
         goto error;
     }
 
-    memcpy(hmac, md_value, HMAC_LEN);
+    memcpy(hmac, md_value, COBFS4_HMAC_LEN);
 
     EVP_PKEY_free(pkey);
     EVP_MD_CTX_free(mdctx);
@@ -47,20 +47,20 @@ error:
     EVP_PKEY_free(pkey);
 free_md_ctx:
     EVP_MD_CTX_free(mdctx);
-    OPENSSL_cleanse(hmac, HMAC_LEN);
+    OPENSSL_cleanse(hmac, COBFS4_HMAC_LEN);
     return -1;
 }
 
 int hmac_verify(const uint8_t* key, const size_t key_len, const uint8_t* message,
         const size_t mesg_len, const uint8_t* hmac) {
-    uint8_t genned_hmac[HMAC_LEN];
+    uint8_t genned_hmac[COBFS4_HMAC_LEN];
 
     if (hmac_gen(key, key_len, message, mesg_len, genned_hmac)) {
         /* Failed to generate test HMAC */
         return -1;
     }
 
-    if (CRYPTO_memcmp(hmac, genned_hmac, HMAC_LEN) == 0) {
+    if (CRYPTO_memcmp(hmac, genned_hmac, COBFS4_HMAC_LEN) == 0) {
         return 0;
     }
     return -1;

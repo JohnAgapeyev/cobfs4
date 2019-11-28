@@ -55,7 +55,7 @@ static bool validate_client_mac(const struct client_request *req,
     }
     memcpy(mac_key + 32, identity_digest, 32);
 
-    if (hmac_verify(mac_key, sizeof(mac_key), req->elligator, REPRESENTATIVE_LEN, req->elligator_hmac)) {
+    if (hmac_verify(mac_key, sizeof(mac_key), req->elligator, COBFS4_ELLIGATOR_LEN, req->elligator_hmac)) {
         goto error;
     }
 
@@ -63,35 +63,35 @@ static bool validate_client_mac(const struct client_request *req,
     const uint64_t hr_time = time(NULL) / 3600;
     int real_hour_len;
 
-    uint8_t packet_hmac_data[REPRESENTATIVE_LEN + MARK_LEN + EPOCH_HOUR_LEN + CLIENT_MAX_PAD_LEN + 1];
-    memcpy(packet_hmac_data, req->elligator, REPRESENTATIVE_LEN);
-    memcpy(packet_hmac_data + REPRESENTATIVE_LEN, req->random_padding, req->padding_len);
-    memcpy(packet_hmac_data + REPRESENTATIVE_LEN + req->padding_len, req->elligator_hmac, MARK_LEN);
+    uint8_t packet_hmac_data[COBFS4_ELLIGATOR_LEN + COBFS4_HMAC_LEN + COBFS4_EPOCH_HOUR_LEN + COBFS4_CLIENT_MAX_PAD_LEN + 1];
+    memcpy(packet_hmac_data, req->elligator, COBFS4_ELLIGATOR_LEN);
+    memcpy(packet_hmac_data + COBFS4_ELLIGATOR_LEN, req->random_padding, req->padding_len);
+    memcpy(packet_hmac_data + COBFS4_ELLIGATOR_LEN + req->padding_len, req->elligator_hmac, COBFS4_HMAC_LEN);
     if ((real_hour_len = snprintf((char *) packet_hmac_data
-                    + REPRESENTATIVE_LEN + req->padding_len + MARK_LEN, EPOCH_HOUR_LEN,
+                    + COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN, COBFS4_EPOCH_HOUR_LEN,
                     "%lu", hr_time)) < 0) {
         goto error;
     }
 
-    size_t hmac_data_len = REPRESENTATIVE_LEN + req->padding_len + MARK_LEN + real_hour_len;
+    size_t hmac_data_len = COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN + real_hour_len;
 
     //dump_hex(packet_hmac_data, hmac_data_len);
 
     //This is dumb but it works
     if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac)) {
         if ((real_hour_len = snprintf((char *) packet_hmac_data
-                        + REPRESENTATIVE_LEN + req->padding_len + MARK_LEN, EPOCH_HOUR_LEN,
+                        + COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN, COBFS4_EPOCH_HOUR_LEN,
                         "%lu", hr_time - 1)) < 0) {
             goto error;
         }
-        hmac_data_len = REPRESENTATIVE_LEN + req->padding_len + MARK_LEN + real_hour_len;
+        hmac_data_len = COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN + real_hour_len;
         if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac)) {
             if ((real_hour_len = snprintf((char *) packet_hmac_data
-                            + REPRESENTATIVE_LEN + req->padding_len + MARK_LEN, EPOCH_HOUR_LEN,
+                            + COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN, COBFS4_EPOCH_HOUR_LEN,
                             "%lu", hr_time + 1)) < 0) {
                 goto error;
             }
-            hmac_data_len = REPRESENTATIVE_LEN + req->padding_len + MARK_LEN + real_hour_len;
+            hmac_data_len = COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN + real_hour_len;
             if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac)) {
                 goto error;
             }
@@ -114,17 +114,17 @@ static bool validate_server_mac(const struct server_response *resp,
     }
     memcpy(mac_key + 32, identity_digest, 32);
 
-    if (hmac_verify(mac_key, sizeof(mac_key), resp->elligator, REPRESENTATIVE_LEN, resp->elligator_hmac)) {
+    if (hmac_verify(mac_key, sizeof(mac_key), resp->elligator, COBFS4_ELLIGATOR_LEN, resp->elligator_hmac)) {
         goto error;
     }
 
-    uint8_t packet_hmac_data[REPRESENTATIVE_LEN + AUTH_LEN + MARK_LEN + EPOCH_HOUR_LEN + SERVER_MAX_PAD_LEN];
-    memcpy(packet_hmac_data, resp->elligator, REPRESENTATIVE_LEN);
-    memcpy(packet_hmac_data + REPRESENTATIVE_LEN, resp->auth_tag, AUTH_LEN);
-    memcpy(packet_hmac_data + REPRESENTATIVE_LEN + AUTH_LEN, resp->random_padding, resp->padding_len);
-    memcpy(packet_hmac_data + REPRESENTATIVE_LEN + AUTH_LEN + resp->padding_len, resp->elligator_hmac, MARK_LEN);
+    uint8_t packet_hmac_data[COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + COBFS4_HMAC_LEN + COBFS4_EPOCH_HOUR_LEN + COBFS4_SERVER_MAX_PAD_LEN];
+    memcpy(packet_hmac_data, resp->elligator, COBFS4_ELLIGATOR_LEN);
+    memcpy(packet_hmac_data + COBFS4_ELLIGATOR_LEN, resp->auth_tag, COBFS4_AUTH_LEN);
+    memcpy(packet_hmac_data + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN, resp->random_padding, resp->padding_len);
+    memcpy(packet_hmac_data + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len, resp->elligator_hmac, COBFS4_HMAC_LEN);
 
-    size_t hmac_data_len = REPRESENTATIVE_LEN + AUTH_LEN + resp->padding_len + MAC_LEN;
+    size_t hmac_data_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN;
 
     dump_hex(packet_hmac_data, hmac_data_len);
 
@@ -148,7 +148,7 @@ int create_client_request(EVP_PKEY *self_keypair,
         goto error;
     }
 
-    out_req->padding_len = rand_interval(CLIENT_MIN_PAD_LEN, CLIENT_MAX_PAD_LEN);
+    out_req->padding_len = rand_interval(COBFS4_CLIENT_MIN_PAD_LEN, COBFS4_CLIENT_MAX_PAD_LEN);
     RAND_bytes(out_req->random_padding, out_req->padding_len);
 
     uint8_t shared_knowledge[32 + 32];
@@ -158,7 +158,7 @@ int create_client_request(EVP_PKEY *self_keypair,
     }
     memcpy(shared_knowledge + 32, identity_digest, 32);
 
-    if (hmac_gen(shared_knowledge, sizeof(shared_knowledge), out_req->elligator, REPRESENTATIVE_LEN, out_req->elligator_hmac)) {
+    if (hmac_gen(shared_knowledge, sizeof(shared_knowledge), out_req->elligator, COBFS4_ELLIGATOR_LEN, out_req->elligator_hmac)) {
         goto error;
     }
 
@@ -166,17 +166,17 @@ int create_client_request(EVP_PKEY *self_keypair,
     const uint64_t hr_time = time(NULL) / 3600;
 
     int real_hour_len;
-    if ((real_hour_len = snprintf((char *) out_req->epoch_hours, EPOCH_HOUR_LEN, "%lu", hr_time)) < 0) {
+    if ((real_hour_len = snprintf((char *) out_req->epoch_hours, COBFS4_EPOCH_HOUR_LEN, "%lu", hr_time)) < 0) {
         goto error;
     }
 
-    uint8_t request_mac_data[REPRESENTATIVE_LEN + MARK_LEN + EPOCH_HOUR_LEN + CLIENT_MAX_PAD_LEN];
-    memcpy(request_mac_data, out_req->elligator, REPRESENTATIVE_LEN);
-    memcpy(request_mac_data + REPRESENTATIVE_LEN, out_req->random_padding, out_req->padding_len);
-    memcpy(request_mac_data + REPRESENTATIVE_LEN + out_req->padding_len, out_req->elligator_hmac, MARK_LEN);
-    memcpy(request_mac_data + REPRESENTATIVE_LEN + out_req->padding_len + MARK_LEN, out_req->epoch_hours, real_hour_len);
+    uint8_t request_mac_data[COBFS4_ELLIGATOR_LEN + COBFS4_HMAC_LEN + COBFS4_EPOCH_HOUR_LEN + COBFS4_CLIENT_MAX_PAD_LEN];
+    memcpy(request_mac_data, out_req->elligator, COBFS4_ELLIGATOR_LEN);
+    memcpy(request_mac_data + COBFS4_ELLIGATOR_LEN, out_req->random_padding, out_req->padding_len);
+    memcpy(request_mac_data + COBFS4_ELLIGATOR_LEN + out_req->padding_len, out_req->elligator_hmac, COBFS4_HMAC_LEN);
+    memcpy(request_mac_data + COBFS4_ELLIGATOR_LEN + out_req->padding_len + COBFS4_HMAC_LEN, out_req->epoch_hours, real_hour_len);
 
-    const size_t hmac_data_len = REPRESENTATIVE_LEN + out_req->padding_len + MARK_LEN + real_hour_len;
+    const size_t hmac_data_len = COBFS4_ELLIGATOR_LEN + out_req->padding_len + COBFS4_HMAC_LEN + real_hour_len;
 
     //dump_hex(request_mac_data, hmac_data_len);
 
@@ -204,7 +204,7 @@ int create_server_response(EVP_PKEY *ntor_keypair,
     EVP_PKEY *ephem_key = NULL;
     uint8_t response_mac_key[32 + 32];
     size_t tmp_len = 32;
-    uint8_t packet_mac_data[REPRESENTATIVE_LEN + AUTH_LEN + SERVER_MAX_PAD_LEN + MAC_LEN + EPOCH_HOUR_LEN];
+    uint8_t packet_mac_data[COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + COBFS4_SERVER_MAX_PAD_LEN + COBFS4_HMAC_LEN + COBFS4_EPOCH_HOUR_LEN];
 
     if (!validate_client_mac(incoming_req, ntor_keypair, identity_digest)) {
         return -1;
@@ -232,7 +232,7 @@ int create_server_response(EVP_PKEY *ntor_keypair,
         goto error;
     }
 
-    out_resp->padding_len = rand_interval(SERVER_MIN_PAD_LEN, SERVER_MAX_PAD_LEN);
+    out_resp->padding_len = rand_interval(COBFS4_SERVER_MIN_PAD_LEN, COBFS4_SERVER_MAX_PAD_LEN);
     RAND_bytes(out_resp->random_padding, out_resp->padding_len);
 
     if (!EVP_PKEY_get_raw_public_key(ntor_keypair, response_mac_key, &tmp_len)) {
@@ -245,15 +245,15 @@ int create_server_response(EVP_PKEY *ntor_keypair,
         goto error;
     }
 
-    memcpy(packet_mac_data, out_resp->elligator, REPRESENTATIVE_LEN);
-    memcpy(packet_mac_data + REPRESENTATIVE_LEN, out_resp->auth_tag, AUTH_LEN);
-    memcpy(packet_mac_data + REPRESENTATIVE_LEN + AUTH_LEN, out_resp->random_padding, out_resp->padding_len);
-    memcpy(packet_mac_data + REPRESENTATIVE_LEN + AUTH_LEN + out_resp->padding_len,
-            out_resp->elligator_hmac, MAC_LEN);
-    memcpy(packet_mac_data + REPRESENTATIVE_LEN + AUTH_LEN + out_resp->padding_len + MAC_LEN,
-            incoming_req->epoch_hours, EPOCH_HOUR_LEN);
+    memcpy(packet_mac_data, out_resp->elligator, COBFS4_ELLIGATOR_LEN);
+    memcpy(packet_mac_data + COBFS4_ELLIGATOR_LEN, out_resp->auth_tag, COBFS4_AUTH_LEN);
+    memcpy(packet_mac_data + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN, out_resp->random_padding, out_resp->padding_len);
+    memcpy(packet_mac_data + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + out_resp->padding_len,
+            out_resp->elligator_hmac, COBFS4_HMAC_LEN);
+    memcpy(packet_mac_data + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + out_resp->padding_len + COBFS4_HMAC_LEN,
+            incoming_req->epoch_hours, COBFS4_EPOCH_HOUR_LEN);
 
-    size_t packet_hmac_len = REPRESENTATIVE_LEN + AUTH_LEN + out_resp->padding_len + MAC_LEN;
+    size_t packet_hmac_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + out_resp->padding_len + COBFS4_HMAC_LEN;
 
     dump_hex(packet_mac_data, packet_hmac_len);
 
