@@ -7,6 +7,7 @@
 #include "ecdh.h"
 #include "ntor.h"
 #include "elligator.h"
+#include "constants.h"
 
 //Stand-in for a real digest, since the value doesn't matter at all
 static const uint8_t *identity_digest = (const uint8_t *) "012345678901234567890123456789ab";
@@ -19,12 +20,12 @@ void test_handshake(void) {
         EVP_PKEY *ntor = ecdh_key_alloc();
         EVP_PKEY *client = ecdh_key_alloc();
 
-        uint8_t tmp_elligator[32];
+        uint8_t tmp_elligator[COBFS4_ELLIGATOR_LEN];
 
-        uint8_t client_tag[32];
-        uint8_t client_seed[32];
-        uint8_t server_tag[32];
-        uint8_t server_seed[32];
+        uint8_t client_tag[COBFS4_AUTH_LEN];
+        uint8_t client_seed[COBFS4_SEED_LEN];
+        uint8_t server_tag[COBFS4_AUTH_LEN];
+        uint8_t server_seed[COBFS4_SEED_LEN];
 
         struct client_request req;
         struct server_response resp;

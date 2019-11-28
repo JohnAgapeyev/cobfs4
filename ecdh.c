@@ -37,9 +37,10 @@ EVP_PKEY *ecdh_key_alloc(void) {
     return pkey;
 }
 
-int ecdh_derive(EVP_PKEY *self_keypair, EVP_PKEY *remote_pub_key, uint8_t out_buffer[static 32]) {
+int ecdh_derive(EVP_PKEY * restrict self_keypair, EVP_PKEY * restrict remote_pub_key,
+        uint8_t out_buffer[static restrict COBFS4_PUBKEY_LEN]) {
     EVP_PKEY_CTX *ctx;
-    uint8_t skey[32];
+    uint8_t skey[COBFS4_PUBKEY_LEN];
     size_t skeylen;
 
     ctx = EVP_PKEY_CTX_new(self_keypair, NULL);
@@ -60,17 +61,15 @@ int ecdh_derive(EVP_PKEY *self_keypair, EVP_PKEY *remote_pub_key, uint8_t out_bu
         goto error;
     }
 
-    if (hash_data(skey, skeylen, skey)) {
+    if (hash_data(skey, skeylen, out_buffer)) {
         goto error;
     }
 
-    memcpy(out_buffer, skey, 32);
-
     EVP_PKEY_CTX_free(ctx);
-
     return 0;
 
 error:
+    OPENSSL_cleanse(out_buffer, COBFS4_PUBKEY_LEN);
     EVP_PKEY_CTX_free(ctx);
     return -1;
 }

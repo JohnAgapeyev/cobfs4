@@ -5,6 +5,7 @@
 #include "test.h"
 #include "ntor.h"
 #include "ecdh.h"
+#include "constants.h"
 
 //Stand-in for a real digest, since the value doesn't matter at all
 static const uint8_t *identity_digest = (const uint8_t *) "012345678901234567890123456789ab";
@@ -18,10 +19,10 @@ void test_ntor(void) {
         EVP_PKEY *X = ecdh_key_alloc();
         EVP_PKEY *Y = ecdh_key_alloc();
 
-        uint8_t client_tag[32];
-        uint8_t client_seed[32];
-        uint8_t server_tag[32];
-        uint8_t server_seed[32];
+        uint8_t client_tag[COBFS4_AUTH_LEN];
+        uint8_t client_seed[COBFS4_SEED_LEN];
+        uint8_t server_tag[COBFS4_AUTH_LEN];
+        uint8_t server_seed[COBFS4_SEED_LEN];
 
         if (server_ntor(Y, X, B, identity_digest, server_tag, server_seed)) {
             ++bad;
@@ -39,7 +40,7 @@ void test_ntor(void) {
             continue;
         }
 
-        if (memcmp(server_tag, client_tag, 32) || memcmp(server_seed, client_seed, 32)) {
+        if (memcmp(server_tag, client_tag, COBFS4_AUTH_LEN) || memcmp(server_seed, client_seed, COBFS4_SEED_LEN)) {
             ++bad;
             EVP_PKEY_free(B);
             EVP_PKEY_free(X);

@@ -3,11 +3,10 @@
 #include <string.h>
 
 #include "hash.h"
+#include "constants.h"
 
-int hash_data(uint8_t *mesg, size_t mesg_len, uint8_t out_buf[static 32]) {
+int hash_data(uint8_t * restrict mesg, size_t mesg_len, uint8_t out_buf[static restrict COBFS4_HASH_LEN]) {
     EVP_MD_CTX *ctx = EVP_MD_CTX_new();
-
-    uint8_t digest[32];
 
     if (!ctx) {
         return -1;
@@ -21,16 +20,15 @@ int hash_data(uint8_t *mesg, size_t mesg_len, uint8_t out_buf[static 32]) {
         goto error;
     }
 
-    if (!EVP_DigestFinal_ex(ctx, digest, NULL)) {
+    if (!EVP_DigestFinal_ex(ctx, out_buf, NULL)) {
         goto error;
     }
-
-    memcpy(out_buf, digest, 32);
 
     EVP_MD_CTX_free(ctx);
     return 0;
 
 error:
+    OPENSSL_cleanse(out_buf, COBFS4_HASH_LEN);
     EVP_MD_CTX_free(ctx);
     return -1;
 }

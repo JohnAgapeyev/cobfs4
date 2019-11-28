@@ -7,6 +7,7 @@
 #include "cobfs4.h"
 #include "elligator.h"
 #include "test.h"
+#include "constants.h"
 
 void test_elligator(void) {
     EVP_PKEY *pkey;
@@ -21,7 +22,7 @@ void test_elligator(void) {
     int bad;
     int invalid;
 
-    uint8_t elligator[32];
+    uint8_t elligator[COBFS4_ELLIGATOR_LEN];
 
     /* size_t i; */
 

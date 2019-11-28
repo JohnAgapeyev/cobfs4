@@ -6,6 +6,7 @@
 #include "cobfs4.h"
 #include "test.h"
 #include "ecdh.h"
+#include "constants.h"
 
 void test_ecdh(void) {
     int good = 0;
@@ -14,8 +15,8 @@ void test_ecdh(void) {
     for (i = 0; i < 10000; ++i) {
         EVP_PKEY *first_key = ecdh_key_alloc();
         EVP_PKEY *second_key = ecdh_key_alloc();
-        uint8_t client_shared[32];
-        uint8_t server_shared[32];
+        uint8_t client_shared[COBFS4_PUBKEY_LEN];
+        uint8_t server_shared[COBFS4_PUBKEY_LEN];
 
         if (ecdh_derive(first_key, second_key, client_shared)) {
             ++bad;
@@ -31,7 +32,7 @@ void test_ecdh(void) {
             continue;
         }
 
-        if (memcmp(client_shared, server_shared, 32) == 0) {
+        if (memcmp(client_shared, server_shared, COBFS4_PUBKEY_LEN) == 0) {
             ++good;
         } else {
             ++bad;
