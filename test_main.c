@@ -7,5 +7,6 @@ int main(void) {
     test_ecdh();
     test_ntor();
     test_handshake();
+    test_aead();
     return 0;
 }

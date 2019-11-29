@@ -121,7 +121,7 @@ static bool validate_server_mac(const struct server_response * restrict resp,
 
     uint8_t mac_key[COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN];
     uint8_t packet_hmac_data[COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN
-        + COBFS4_HMAC_LEN + COBFS4_SERVER_MAX_PAD_LEN];
+        + COBFS4_HMAC_LEN + COBFS4_SERVER_MAX_PAD_LEN + COBFS4_EPOCH_HOUR_LEN];
 
     if (!make_shared_data(ntor_keypair, identity_digest, mac_key)) {
         goto error;
@@ -136,7 +136,17 @@ static bool validate_server_mac(const struct server_response * restrict resp,
     memcpy(packet_hmac_data + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN, resp->random_padding, resp->padding_len);
     memcpy(packet_hmac_data + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len, resp->elligator_hmac, COBFS4_HMAC_LEN);
 
-    const size_t actual_data_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN;
+    const uint64_t hr_time = time(NULL) / 3600;
+    int real_hour_len;
+
+    if ((real_hour_len = snprintf((char *) packet_hmac_data
+                    + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN,
+                    COBFS4_EPOCH_HOUR_LEN,
+                    "%lu", hr_time)) < 0) {
+        goto error;
+    }
+
+    const size_t actual_data_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN + real_hour_len;
 
     dump_hex(packet_hmac_data, actual_data_len);
 
@@ -213,7 +223,7 @@ int create_server_response(EVP_PKEY *  restrict ntor_keypair,
     EVP_PKEY *ephem_key = NULL;
     uint8_t mac_key[COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN];
     uint8_t packet_mac_data[COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN
-        + COBFS4_SERVER_MAX_PAD_LEN + COBFS4_HMAC_LEN];
+        + COBFS4_SERVER_MAX_PAD_LEN + COBFS4_HMAC_LEN + COBFS4_EPOCH_HOUR_LEN];
 
     if (!validate_client_mac(incoming_req, ntor_keypair, identity_digest)) {
         return -1;
@@ -260,7 +270,7 @@ int create_server_response(EVP_PKEY *  restrict ntor_keypair,
     memcpy(packet_mac_data + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + out_resp->padding_len + COBFS4_HMAC_LEN,
             incoming_req->epoch_hours, COBFS4_EPOCH_HOUR_LEN);
 
-    size_t packet_hmac_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + out_resp->padding_len + COBFS4_HMAC_LEN;
+    size_t packet_hmac_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + out_resp->padding_len + COBFS4_HMAC_LEN + COBFS4_EPOCH_HOUR_LEN;
 
     dump_hex(packet_mac_data, packet_hmac_len);
 
