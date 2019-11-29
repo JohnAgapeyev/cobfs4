@@ -224,6 +224,8 @@ int create_server_response(EVP_PKEY *  restrict ntor_keypair,
     uint8_t mac_key[COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN];
     uint8_t packet_mac_data[COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN
         + COBFS4_SERVER_MAX_PAD_LEN + COBFS4_HMAC_LEN + COBFS4_EPOCH_HOUR_LEN];
+    const size_t packet_hmac_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN
+        + out_resp->padding_len + COBFS4_HMAC_LEN + COBFS4_EPOCH_HOUR_LEN;
 
     if (!validate_client_mac(incoming_req, ntor_keypair, identity_digest)) {
         return -1;
@@ -269,8 +271,6 @@ int create_server_response(EVP_PKEY *  restrict ntor_keypair,
             out_resp->elligator_hmac, COBFS4_HMAC_LEN);
     memcpy(packet_mac_data + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + out_resp->padding_len + COBFS4_HMAC_LEN,
             incoming_req->epoch_hours, COBFS4_EPOCH_HOUR_LEN);
-
-    size_t packet_hmac_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + out_resp->padding_len + COBFS4_HMAC_LEN + COBFS4_EPOCH_HOUR_LEN;
 
     dump_hex(packet_mac_data, packet_hmac_len);
 
