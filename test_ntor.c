@@ -15,26 +15,29 @@ void test_ntor(void) {
     int bad = 0;
     int i = 0;
     for (i = 0; i < 10000; ++i) {
-        EVP_PKEY *B = ecdh_key_alloc();
         EVP_PKEY *X = ecdh_key_alloc();
         EVP_PKEY *Y = ecdh_key_alloc();
+
+        struct shared_data shared;
+        shared.ntor = ecdh_key_alloc();
+        memcpy(&shared.identity_digest, identity_digest, strlen((char *) identity_digest));
 
         uint8_t client_tag[COBFS4_AUTH_LEN];
         uint8_t client_seed[COBFS4_SEED_LEN];
         uint8_t server_tag[COBFS4_AUTH_LEN];
         uint8_t server_seed[COBFS4_SEED_LEN];
 
-        if (server_ntor(Y, X, B, identity_digest, server_tag, server_seed)) {
+        if (server_ntor(Y, X, &shared, server_tag, server_seed)) {
             ++bad;
-            EVP_PKEY_free(B);
+            EVP_PKEY_free(shared.ntor);
             EVP_PKEY_free(X);
             EVP_PKEY_free(Y);
             continue;
         }
 
-        if (client_ntor(X, Y, B, identity_digest, client_tag, client_seed)) {
+        if (client_ntor(X, Y, &shared, client_tag, client_seed)) {
             ++bad;
-            EVP_PKEY_free(B);
+            EVP_PKEY_free(shared.ntor);
             EVP_PKEY_free(X);
             EVP_PKEY_free(Y);
             continue;
@@ -42,14 +45,14 @@ void test_ntor(void) {
 
         if (memcmp(server_tag, client_tag, COBFS4_AUTH_LEN) || memcmp(server_seed, client_seed, COBFS4_SEED_LEN)) {
             ++bad;
-            EVP_PKEY_free(B);
+            EVP_PKEY_free(shared.ntor);
             EVP_PKEY_free(X);
             EVP_PKEY_free(Y);
             continue;
         }
 
         ++good;
-        EVP_PKEY_free(B);
+        EVP_PKEY_free(shared.ntor);
         EVP_PKEY_free(X);
         EVP_PKEY_free(Y);
     }

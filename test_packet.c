@@ -17,7 +17,6 @@ void test_handshake(void) {
     int bad = 0;
     int i = 0;
     for (i = 0; i < 10000; ++i) {
-        EVP_PKEY *ntor = ecdh_key_alloc();
         EVP_PKEY *client = ecdh_key_alloc();
 
         uint8_t tmp_elligator[COBFS4_ELLIGATOR_LEN];
@@ -30,48 +29,52 @@ void test_handshake(void) {
         struct client_request req;
         struct server_response resp;
 
+        struct shared_data shared;
+        shared.ntor = ecdh_key_alloc();
+        memcpy(&shared.identity_digest, identity_digest, strlen((char *) identity_digest));
+
         while (elligator2(client, tmp_elligator) == -1) {
             EVP_PKEY_free(client);
             client = ecdh_key_alloc();
         }
 
-        if (create_client_request(client, ntor, identity_digest, &req) == -1) {
+        if (create_client_request(client, &shared, &req) == -1) {
             ++bad;
-            EVP_PKEY_free(ntor);
+            EVP_PKEY_free(shared.ntor);
             EVP_PKEY_free(client);
             continue;
         }
 
-        if (create_server_response(ntor, identity_digest, &req, &resp, server_tag, server_seed) == -1) {
+        if (create_server_response(&shared, &req, &resp, server_tag, server_seed) == -1) {
             ++bad;
-            EVP_PKEY_free(ntor);
+            EVP_PKEY_free(shared.ntor);
             EVP_PKEY_free(client);
             continue;
         }
 
-        if (client_process_server_response(client, ntor, identity_digest, &resp, client_tag, client_seed) == -1) {
+        if (client_process_server_response(client, &shared, &resp, client_tag, client_seed) == -1) {
             ++bad;
-            EVP_PKEY_free(ntor);
+            EVP_PKEY_free(shared.ntor);
             EVP_PKEY_free(client);
             continue;
         }
 
         if (memcmp(client_tag, server_tag, sizeof(client_tag)) != 0) {
             ++bad;
-            EVP_PKEY_free(ntor);
+            EVP_PKEY_free(shared.ntor);
             EVP_PKEY_free(client);
             continue;
         }
 
         if (memcmp(client_seed, server_seed, sizeof(client_seed)) != 0) {
             ++bad;
-            EVP_PKEY_free(ntor);
+            EVP_PKEY_free(shared.ntor);
             EVP_PKEY_free(client);
             continue;
         }
 
         ++good;
-        EVP_PKEY_free(ntor);
+        EVP_PKEY_free(shared.ntor);
         EVP_PKEY_free(client);
     }
 

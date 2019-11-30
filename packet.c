@@ -48,23 +48,21 @@ static inline uint64_t rand_interval(const uint64_t min, const uint64_t max) {
  * Returns a concatenation of the ntor public key and the identity key digest
  * This is used as an HMAC key throughout, so it's useful to have.
  */
-static inline bool make_shared_data(EVP_PKEY * restrict ntor_keypair,
-        const uint8_t identity_digest[static restrict COBFS4_HASH_LEN],
+static inline bool make_shared_data(const struct shared_data * restrict shared,
         uint8_t out_shared_data[static restrict COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN]) {
     size_t tmp_len = COBFS4_PUBKEY_LEN;
-    if (!EVP_PKEY_get_raw_public_key(ntor_keypair, out_shared_data, &tmp_len)) {
+    if (!EVP_PKEY_get_raw_public_key(shared->ntor, out_shared_data, &tmp_len)) {
         OPENSSL_cleanse(out_shared_data, COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN);
         return false;
     }
-    memcpy(out_shared_data + COBFS4_PUBKEY_LEN, identity_digest, COBFS4_HASH_LEN);
+    memcpy(out_shared_data + COBFS4_PUBKEY_LEN, shared->identity_digest, COBFS4_HASH_LEN);
     return true;
 }
 
 static bool validate_client_mac(const struct client_request * restrict req,
-        EVP_PKEY * restrict ntor_keypair,
-        const uint8_t identity_digest[static restrict COBFS4_HASH_LEN]) {
+        const struct shared_data * restrict shared) {
     uint8_t mac_key[COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN];
-    if (!make_shared_data(ntor_keypair, identity_digest, mac_key)) {
+    if (!make_shared_data(shared, mac_key)) {
         goto error;
     }
 
@@ -116,14 +114,13 @@ error:
 }
 
 static bool validate_server_mac(const struct server_response * restrict resp,
-        EVP_PKEY * restrict ntor_keypair,
-        const uint8_t identity_digest[static restrict COBFS4_HASH_LEN]) {
+        const struct shared_data * restrict shared) {
 
     uint8_t mac_key[COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN];
     uint8_t packet_hmac_data[COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN
         + COBFS4_HMAC_LEN + COBFS4_SERVER_MAX_PAD_LEN + COBFS4_EPOCH_HOUR_LEN];
 
-    if (!make_shared_data(ntor_keypair, identity_digest, mac_key)) {
+    if (!make_shared_data(shared, mac_key)) {
         goto error;
     }
 
@@ -160,8 +157,7 @@ error:
 }
 
 int create_client_request(EVP_PKEY * restrict self_keypair,
-        EVP_PKEY * restrict ntor_keypair,
-        const uint8_t identity_digest[static restrict COBFS4_HASH_LEN],
+        const struct shared_data * restrict shared,
         struct client_request * restrict out_req) {
 
     uint8_t mac_key[COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN];
@@ -175,7 +171,7 @@ int create_client_request(EVP_PKEY * restrict self_keypair,
     out_req->padding_len = rand_interval(COBFS4_CLIENT_MIN_PAD_LEN, COBFS4_CLIENT_MAX_PAD_LEN);
     RAND_bytes(out_req->random_padding, out_req->padding_len);
 
-    if (!make_shared_data(ntor_keypair, identity_digest, mac_key)) {
+    if (!make_shared_data(shared, mac_key)) {
         goto error;
     }
 
@@ -213,8 +209,7 @@ error:
     return -1;
 }
 
-int create_server_response(EVP_PKEY *  restrict ntor_keypair,
-        const uint8_t identity_digest[static restrict COBFS4_HASH_LEN],
+int create_server_response(const struct shared_data * restrict shared,
         const struct client_request * restrict incoming_req,
         struct server_response * restrict out_resp,
         uint8_t out_auth[static restrict COBFS4_AUTH_LEN],
@@ -227,7 +222,7 @@ int create_server_response(EVP_PKEY *  restrict ntor_keypair,
     const size_t packet_hmac_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN
         + out_resp->padding_len + COBFS4_HMAC_LEN + COBFS4_EPOCH_HOUR_LEN;
 
-    if (!validate_client_mac(incoming_req, ntor_keypair, identity_digest)) {
+    if (!validate_client_mac(incoming_req, shared)) {
         return -1;
     }
 
@@ -249,14 +244,14 @@ int create_server_response(EVP_PKEY *  restrict ntor_keypair,
         goto error;
     }
 
-    if (server_ntor(ephem_key, client_pubkey, ntor_keypair, identity_digest, out_resp->auth_tag, out_seed)) {
+    if (server_ntor(ephem_key, client_pubkey, shared, out_resp->auth_tag, out_seed)) {
         goto error;
     }
 
     out_resp->padding_len = rand_interval(COBFS4_SERVER_MIN_PAD_LEN, COBFS4_SERVER_MAX_PAD_LEN);
     RAND_bytes(out_resp->random_padding, out_resp->padding_len);
 
-    if (!make_shared_data(ntor_keypair, identity_digest, mac_key)) {
+    if (!make_shared_data(shared, mac_key)) {
         goto error;
     }
 
@@ -293,12 +288,11 @@ error:
 }
 
 int client_process_server_response(EVP_PKEY * restrict self_keypair,
-        EVP_PKEY * restrict ntor_keypair,
-        const uint8_t identity_digest[static COBFS4_HASH_LEN],
+        const struct shared_data * restrict shared,
         struct server_response * restrict resp,
         uint8_t out_auth[static restrict COBFS4_AUTH_LEN],
         uint8_t out_seed[static restrict COBFS4_SEED_LEN]) {
-    if (!validate_server_mac(resp, ntor_keypair, identity_digest)) {
+    if (!validate_server_mac(resp, shared)) {
         return -1;
     }
 
@@ -307,7 +301,7 @@ int client_process_server_response(EVP_PKEY * restrict self_keypair,
         return -1;
     }
 
-    if (client_ntor(self_keypair, server_pubkey, ntor_keypair, identity_digest, out_auth, out_seed) == -1) {
+    if (client_ntor(self_keypair, server_pubkey, shared, out_auth, out_seed) == -1) {
         goto error;
     }
 

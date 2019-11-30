@@ -15,8 +15,7 @@ static const char *server_string = "Server";
 
 int server_ntor(EVP_PKEY * restrict ephem_keypair,
         EVP_PKEY * restrict remote_pubkey,
-        EVP_PKEY * restrict ntor_keypair,
-        const uint8_t identity_digest[static restrict COBFS4_HASH_LEN],
+        const struct shared_data * restrict shared,
         uint8_t out_auth[static restrict COBFS4_AUTH_LEN],
         uint8_t out_keyseed[static restrict COBFS4_SEED_LEN]) {
 
@@ -48,14 +47,14 @@ int server_ntor(EVP_PKEY * restrict ephem_keypair,
     if (ecdh_derive(ephem_keypair, remote_pubkey, secret_input)) {
         goto error;
     }
-    if (ecdh_derive(ntor_keypair, remote_pubkey, secret_input + COBFS4_PUBKEY_LEN)) {
+    if (ecdh_derive(shared->ntor, remote_pubkey, secret_input + COBFS4_PUBKEY_LEN)) {
         goto error;
     }
 
-    memcpy(secret_input + (2 * COBFS4_PUBKEY_LEN), identity_digest, COBFS4_HASH_LEN);
+    memcpy(secret_input + (2 * COBFS4_PUBKEY_LEN), shared->identity_digest, COBFS4_HASH_LEN);
 
     tmp_len = 32;
-    if (!EVP_PKEY_get_raw_public_key(ntor_keypair, secret_input + (2 * COBFS4_PUBKEY_LEN) + COBFS4_HASH_LEN, &tmp_len)) {
+    if (!EVP_PKEY_get_raw_public_key(shared->ntor, secret_input + (2 * COBFS4_PUBKEY_LEN) + COBFS4_HASH_LEN, &tmp_len)) {
         goto error;
     }
     tmp_len = 32;
@@ -80,7 +79,7 @@ int server_ntor(EVP_PKEY * restrict ephem_keypair,
     }
 
     memcpy(auth_input, verify, COBFS4_HMAC_LEN);
-    memcpy(auth_input + COBFS4_HMAC_LEN, identity_digest, COBFS4_HASH_LEN);
+    memcpy(auth_input + COBFS4_HMAC_LEN, shared->identity_digest, COBFS4_HASH_LEN);
     memcpy(auth_input + COBFS4_HMAC_LEN + COBFS4_HASH_LEN,
             secret_input + (2 * COBFS4_PUBKEY_LEN) + COBFS4_HASH_LEN, COBFS4_PUBKEY_LEN);
     memcpy(auth_input + COBFS4_HMAC_LEN + COBFS4_HASH_LEN + COBFS4_PUBKEY_LEN,
@@ -111,8 +110,7 @@ error:
 
 int client_ntor(EVP_PKEY * restrict ephem_keypair,
         EVP_PKEY * restrict remote_pubkey,
-        EVP_PKEY * restrict ntor_pubkey,
-        const uint8_t identity_digest[static restrict COBFS4_HASH_LEN],
+        const struct shared_data * restrict shared,
         uint8_t out_auth[static restrict COBFS4_AUTH_LEN],
         uint8_t out_keyseed[static restrict COBFS4_SEED_LEN]) {
     /*
@@ -143,14 +141,14 @@ int client_ntor(EVP_PKEY * restrict ephem_keypair,
     if (ecdh_derive(ephem_keypair, remote_pubkey, secret_input)) {
         goto error;
     }
-    if (ecdh_derive(ephem_keypair, ntor_pubkey, secret_input + COBFS4_PUBKEY_LEN)) {
+    if (ecdh_derive(ephem_keypair, shared->ntor, secret_input + COBFS4_PUBKEY_LEN)) {
         goto error;
     }
 
-    memcpy(secret_input + (2 * COBFS4_PUBKEY_LEN), identity_digest, COBFS4_HASH_LEN);
+    memcpy(secret_input + (2 * COBFS4_PUBKEY_LEN), shared->identity_digest, COBFS4_HASH_LEN);
 
     tmp_len = 32;
-    if (!EVP_PKEY_get_raw_public_key(ntor_pubkey, secret_input + (2 * COBFS4_PUBKEY_LEN) + COBFS4_HASH_LEN, &tmp_len)) {
+    if (!EVP_PKEY_get_raw_public_key(shared->ntor, secret_input + (2 * COBFS4_PUBKEY_LEN) + COBFS4_HASH_LEN, &tmp_len)) {
         goto error;
     }
     tmp_len = 32;
@@ -174,7 +172,7 @@ int client_ntor(EVP_PKEY * restrict ephem_keypair,
     }
 
     memcpy(auth_input, verify, COBFS4_HMAC_LEN);
-    memcpy(auth_input + COBFS4_HMAC_LEN, identity_digest, COBFS4_HASH_LEN);
+    memcpy(auth_input + COBFS4_HMAC_LEN, shared->identity_digest, COBFS4_HASH_LEN);
     memcpy(auth_input + COBFS4_HMAC_LEN + COBFS4_HASH_LEN,
             secret_input + (2 * COBFS4_PUBKEY_LEN) + COBFS4_HASH_LEN, COBFS4_PUBKEY_LEN);
     memcpy(auth_input + COBFS4_HMAC_LEN + COBFS4_HASH_LEN + COBFS4_PUBKEY_LEN,
