@@ -8,16 +8,19 @@ struct shared_data {
     uint8_t identity_digest[COBFS4_HASH_LEN];
 };
 
+struct ntor_output {
+    uint8_t auth_tag[COBFS4_AUTH_LEN];
+    uint8_t key_seed[COBFS4_SEED_LEN];
+};
+
 int server_ntor(EVP_PKEY * restrict ephem_keypair,
         EVP_PKEY * restrict remote_pubkey,
         const struct shared_data * restrict shared,
-        uint8_t out_auth[static restrict COBFS4_AUTH_LEN],
-        uint8_t out_keyseed[static restrict COBFS4_SEED_LEN]);
+        struct ntor_output * restrict out);
 
 int client_ntor(EVP_PKEY * restrict ephem_keypair,
         EVP_PKEY * restrict remote_pubkey,
         const struct shared_data * restrict shared,
-        uint8_t out_auth[static restrict COBFS4_AUTH_LEN],
-        uint8_t out_keyseed[static restrict COBFS4_SEED_LEN]);
+        struct ntor_output * restrict out);
 
 #endif

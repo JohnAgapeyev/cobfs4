@@ -212,8 +212,7 @@ error:
 int create_server_response(const struct shared_data * restrict shared,
         const struct client_request * restrict incoming_req,
         struct server_response * restrict out_resp,
-        uint8_t out_auth[static restrict COBFS4_AUTH_LEN],
-        uint8_t out_seed[static restrict COBFS4_SEED_LEN]) {
+        struct ntor_output * restrict out_ntor) {
     EVP_PKEY *client_pubkey = NULL;
     EVP_PKEY *ephem_key = NULL;
     uint8_t mac_key[COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN];
@@ -242,10 +241,11 @@ int create_server_response(const struct shared_data * restrict shared,
         goto error;
     }
 
-    if (server_ntor(ephem_key, client_pubkey, shared, out_resp->auth_tag, out_seed)) {
+    if (server_ntor(ephem_key, client_pubkey, shared, out_ntor)) {
         goto error;
     }
 
+    memcpy(out_resp->auth_tag, out_ntor->auth_tag, COBFS4_AUTH_LEN);
     out_resp->padding_len = rand_interval(COBFS4_SERVER_MIN_PAD_LEN, COBFS4_SERVER_MAX_PAD_LEN);
     RAND_bytes(out_resp->random_padding, out_resp->padding_len);
 
@@ -258,7 +258,7 @@ int create_server_response(const struct shared_data * restrict shared,
     }
 
     memcpy(packet_mac_data, out_resp->elligator, COBFS4_ELLIGATOR_LEN);
-    memcpy(packet_mac_data + COBFS4_ELLIGATOR_LEN, out_resp->auth_tag, COBFS4_AUTH_LEN);
+    memcpy(packet_mac_data + COBFS4_ELLIGATOR_LEN, out_ntor->auth_tag, COBFS4_AUTH_LEN);
     memcpy(packet_mac_data + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN, out_resp->random_padding, out_resp->padding_len);
     memcpy(packet_mac_data + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + out_resp->padding_len,
             out_resp->elligator_hmac, COBFS4_HMAC_LEN);
@@ -274,8 +274,6 @@ int create_server_response(const struct shared_data * restrict shared,
         goto error;
     }
 
-    memcpy(out_auth, out_resp->auth_tag, sizeof(out_resp->auth_tag));
-
     EVP_PKEY_free(ephem_key);
     return 0;
 
@@ -283,16 +281,14 @@ error:
     EVP_PKEY_free(ephem_key);
     EVP_PKEY_free(client_pubkey);
     OPENSSL_cleanse(out_resp, sizeof(*out_resp));
-    OPENSSL_cleanse(out_auth, sizeof(COBFS4_AUTH_LEN));
-    OPENSSL_cleanse(out_seed, sizeof(COBFS4_SEED_LEN));
+    OPENSSL_cleanse(out_ntor, sizeof(*out_ntor));
     return -1;
 }
 
 int client_process_server_response(EVP_PKEY * restrict self_keypair,
         const struct shared_data * restrict shared,
         struct server_response * restrict resp,
-        uint8_t out_auth[static restrict COBFS4_AUTH_LEN],
-        uint8_t out_seed[static restrict COBFS4_SEED_LEN]) {
+        struct ntor_output * restrict out_ntor) {
     if (!validate_server_mac(resp, shared)) {
         return -1;
     }
@@ -302,18 +298,17 @@ int client_process_server_response(EVP_PKEY * restrict self_keypair,
         return -1;
     }
 
-    if (client_ntor(self_keypair, server_pubkey, shared, out_auth, out_seed) == -1) {
+    if (client_ntor(self_keypair, server_pubkey, shared, out_ntor) == -1) {
         goto error;
     }
 
-    if (CRYPTO_memcmp(out_auth, resp->auth_tag, sizeof(COBFS4_AUTH_LEN)) != 0) {
+    if (CRYPTO_memcmp(out_ntor->auth_tag, resp->auth_tag, sizeof(COBFS4_AUTH_LEN)) != 0) {
         goto error;
     }
     return 0;
 
 error:
     EVP_PKEY_free(server_pubkey);
-    OPENSSL_cleanse(out_auth, COBFS4_AUTH_LEN);
-    OPENSSL_cleanse(out_seed, COBFS4_SEED_LEN);
+    OPENSSL_cleanse(out_ntor, sizeof(*out_ntor));
     return -1;
 }

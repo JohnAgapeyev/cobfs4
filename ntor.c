@@ -16,8 +16,7 @@ static const char *server_string = "Server";
 int server_ntor(EVP_PKEY * restrict ephem_keypair,
         EVP_PKEY * restrict remote_pubkey,
         const struct shared_data * restrict shared,
-        uint8_t out_auth[static restrict COBFS4_AUTH_LEN],
-        uint8_t out_keyseed[static restrict COBFS4_SEED_LEN]) {
+        struct ntor_output * restrict out) {
 
     /*
      * Numbers are as follows:
@@ -70,7 +69,7 @@ int server_ntor(EVP_PKEY * restrict ephem_keypair,
 
     const size_t secret_len = (5 * COBFS4_PUBKEY_LEN) + COBFS4_HASH_LEN + strlen(protoid);
 
-    if (hmac_gen((const uint8_t *) t_key, strlen(t_key), secret_input, secret_len, out_keyseed)) {
+    if (hmac_gen((const uint8_t *) t_key, strlen(t_key), secret_input, secret_len, out->key_seed)) {
         goto error;
     }
 
@@ -96,23 +95,22 @@ int server_ntor(EVP_PKEY * restrict ephem_keypair,
     size_t auth_len = COBFS4_HMAC_LEN + COBFS4_HASH_LEN + (3 * COBFS4_PUBKEY_LEN)
         + strlen(protoid) + strlen(protoid) + strlen(server_string);
 
-    if (hmac_gen((const uint8_t *) t_mac, strlen(t_mac), auth_input, auth_len, out_auth)) {
+    if (hmac_gen((const uint8_t *) t_mac, strlen(t_mac), auth_input, auth_len, out->auth_tag)) {
         goto error;
     }
 
     return 0;
 
 error:
-    OPENSSL_cleanse(out_auth, COBFS4_AUTH_LEN);
-    OPENSSL_cleanse(out_keyseed, COBFS4_SEED_LEN);
+    OPENSSL_cleanse(out->auth_tag, COBFS4_AUTH_LEN);
+    OPENSSL_cleanse(out->key_seed, COBFS4_SEED_LEN);
     return -1;
 }
 
 int client_ntor(EVP_PKEY * restrict ephem_keypair,
         EVP_PKEY * restrict remote_pubkey,
         const struct shared_data * restrict shared,
-        uint8_t out_auth[static restrict COBFS4_AUTH_LEN],
-        uint8_t out_keyseed[static restrict COBFS4_SEED_LEN]) {
+        struct ntor_output * restrict out) {
     /*
      * Numbers are as follows:
      * 2 ecdh results
@@ -163,7 +161,7 @@ int client_ntor(EVP_PKEY * restrict ephem_keypair,
 
     const size_t secret_len = (5 * COBFS4_PUBKEY_LEN) + COBFS4_HASH_LEN + strlen(protoid);
 
-    if (hmac_gen((const uint8_t *) t_key, strlen(t_key), secret_input, secret_len, out_keyseed)) {
+    if (hmac_gen((const uint8_t *) t_key, strlen(t_key), secret_input, secret_len, out->key_seed)) {
         goto error;
     }
 
@@ -189,14 +187,14 @@ int client_ntor(EVP_PKEY * restrict ephem_keypair,
     size_t auth_len = COBFS4_HMAC_LEN + COBFS4_HASH_LEN + (3 * COBFS4_PUBKEY_LEN)
         + strlen(protoid) + strlen(protoid) + strlen(server_string);
 
-    if (hmac_gen((const uint8_t *) t_mac, strlen(t_mac), auth_input, auth_len, out_auth)) {
+    if (hmac_gen((const uint8_t *) t_mac, strlen(t_mac), auth_input, auth_len, out->auth_tag)) {
         goto error;
     }
 
     return 0;
 
 error:
-    OPENSSL_cleanse(out_auth, COBFS4_AUTH_LEN);
-    OPENSSL_cleanse(out_keyseed, COBFS4_SEED_LEN);
+    OPENSSL_cleanse(out->auth_tag, COBFS4_AUTH_LEN);
+    OPENSSL_cleanse(out->key_seed, COBFS4_SEED_LEN);
     return -1;
 }

@@ -44,13 +44,11 @@ int create_client_request(EVP_PKEY * restrict self_keypair,
 int create_server_response(const struct shared_data * restrict shared,
         const struct client_request * restrict incoming_req,
         struct server_response * restrict out_resp,
-        uint8_t out_auth[static restrict COBFS4_AUTH_LEN],
-        uint8_t out_seed[static restrict COBFS4_SEED_LEN]);
+        struct ntor_output * restrict out_ntor);
 
 int client_process_server_response(EVP_PKEY * restrict self_keypair,
         const struct shared_data * restrict shared,
         struct server_response * restrict resp,
-        uint8_t out_auth[static restrict COBFS4_AUTH_LEN],
-        uint8_t out_seed[static restrict COBFS4_SEED_LEN]);
+        struct ntor_output * restrict out_ntor);
 
 #endif /* COBFS4_PACKET */

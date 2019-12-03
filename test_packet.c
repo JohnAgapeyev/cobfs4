@@ -17,14 +17,12 @@ void test_handshake(void) {
     int bad = 0;
     int i = 0;
     for (i = 0; i < 10000; ++i) {
-        EVP_PKEY *client = ecdh_key_alloc();
+        EVP_PKEY *client_key = ecdh_key_alloc();
 
         uint8_t tmp_elligator[COBFS4_ELLIGATOR_LEN];
 
-        uint8_t client_tag[COBFS4_AUTH_LEN];
-        uint8_t client_seed[COBFS4_SEED_LEN];
-        uint8_t server_tag[COBFS4_AUTH_LEN];
-        uint8_t server_seed[COBFS4_SEED_LEN];
+        struct ntor_output client;
+        struct ntor_output server;
 
         struct client_request req;
         struct server_response resp;
@@ -33,49 +31,49 @@ void test_handshake(void) {
         shared.ntor = ecdh_key_alloc();
         memcpy(&shared.identity_digest, identity_digest, strlen((char *) identity_digest));
 
-        while (elligator2(client, tmp_elligator) == -1) {
-            EVP_PKEY_free(client);
-            client = ecdh_key_alloc();
+        while (elligator2(client_key, tmp_elligator) == -1) {
+            EVP_PKEY_free(client_key);
+            client_key = ecdh_key_alloc();
         }
 
-        if (create_client_request(client, &shared, &req) == -1) {
+        if (create_client_request(client_key, &shared, &req) == -1) {
             ++bad;
             EVP_PKEY_free(shared.ntor);
-            EVP_PKEY_free(client);
+            EVP_PKEY_free(client_key);
             continue;
         }
 
-        if (create_server_response(&shared, &req, &resp, server_tag, server_seed) == -1) {
+        if (create_server_response(&shared, &req, &resp, &server) == -1) {
             ++bad;
             EVP_PKEY_free(shared.ntor);
-            EVP_PKEY_free(client);
+            EVP_PKEY_free(client_key);
             continue;
         }
 
-        if (client_process_server_response(client, &shared, &resp, client_tag, client_seed) == -1) {
+        if (client_process_server_response(client_key, &shared, &resp, &client) == -1) {
             ++bad;
             EVP_PKEY_free(shared.ntor);
-            EVP_PKEY_free(client);
+            EVP_PKEY_free(client_key);
             continue;
         }
 
-        if (memcmp(client_tag, server_tag, sizeof(client_tag)) != 0) {
+        if (memcmp(client.auth_tag, server.auth_tag, COBFS4_AUTH_LEN) != 0) {
             ++bad;
             EVP_PKEY_free(shared.ntor);
-            EVP_PKEY_free(client);
+            EVP_PKEY_free(client_key);
             continue;
         }
 
-        if (memcmp(client_seed, server_seed, sizeof(client_seed)) != 0) {
+        if (memcmp(client.key_seed, server.key_seed, COBFS4_SEED_LEN) != 0) {
             ++bad;
             EVP_PKEY_free(shared.ntor);
-            EVP_PKEY_free(client);
+            EVP_PKEY_free(client_key);
             continue;
         }
 
         ++good;
         EVP_PKEY_free(shared.ntor);
-        EVP_PKEY_free(client);
+        EVP_PKEY_free(client_key);
     }
 
     printf("Packet handshake testing ran %d times\nResults:\nGood: %d\nBad: %d\n", i, good, bad);
