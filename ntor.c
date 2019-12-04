@@ -93,7 +93,7 @@ int server_ntor(EVP_PKEY * restrict ephem_keypair,
             server_string, strlen(server_string));
 
     size_t auth_len = COBFS4_HMAC_LEN + COBFS4_HASH_LEN + (3 * COBFS4_PUBKEY_LEN)
-        + strlen(protoid) + strlen(protoid) + strlen(server_string);
+        + strlen(protoid) + strlen(server_string);
 
     if (hmac_gen((const uint8_t *) t_mac, strlen(t_mac), auth_input, auth_len, out->auth_tag)) {
         goto error;
@@ -185,7 +185,7 @@ int client_ntor(EVP_PKEY * restrict ephem_keypair,
             server_string, strlen(server_string));
 
     size_t auth_len = COBFS4_HMAC_LEN + COBFS4_HASH_LEN + (3 * COBFS4_PUBKEY_LEN)
-        + strlen(protoid) + strlen(protoid) + strlen(server_string);
+        + strlen(protoid) + strlen(server_string);
 
     if (hmac_gen((const uint8_t *) t_mac, strlen(t_mac), auth_input, auth_len, out->auth_tag)) {
         goto error;

@@ -1,11 +1,11 @@
 BASEFLAGS=-Wall -Wextra -std=c99 -Wpedantic -Wuninitialized -Wundef -Wcast-align -Wstrict-overflow=2 -Wwrite-strings -Wno-format-nonliteral
-DEBUGFLAGS=-ggdb -g3 -O0
+DEBUGFLAGS=-ggdb -g3 -O0 -fsanitize=address
 RELEASEFLAGS=-s -O3 -march=native -flto -DNDEBUG
 CLIBS=-lcrypto
 EXEC=cobfs4
 DEPS=$(EXEC).d
-SRCS=elligator.c hmac.c packet.c kdf.c ecdh.c hash.c ntor.c frame.c
-TEST_SRCS=test_main.c test_elligator.c test_hmac.c test_ecdh.c test_ntor.c test_packet.c test_frame.c
+SRCS=elligator.c hmac.c packet.c kdf.c ecdh.c hash.c ntor.c frame.c random.c
+TEST_SRCS=test_main.c test_elligator.c test_hmac.c test_ecdh.c test_ntor.c test_packet.c test_frame.c test_random.c
 HEADWILD=$(wildcard *.h)
 
 debug release: all

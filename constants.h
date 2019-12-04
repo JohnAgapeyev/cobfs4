@@ -4,6 +4,7 @@
 #define COBFS4_SECRET_KEY_LEN 32
 #define COBFS4_TAG_LEN 16
 #define COBFS4_IV_LEN 12
+#define COBFS4_BLOCK_LEN 16 //Only used for deterministic RNG
 
 #define COBFS4_PUBKEY_LEN 32
 #define COBFS4_ELLIGATOR_LEN 32

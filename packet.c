@@ -133,7 +133,7 @@ static bool validate_server_mac(const struct server_response * restrict resp,
     memcpy(packet_hmac_data + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN, resp->random_padding, resp->padding_len);
     memcpy(packet_hmac_data + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len, resp->elligator_hmac, COBFS4_HMAC_LEN);
 
-    const uint64_t hr_time = time(NULL) / 3600;
+    uint64_t hr_time = time(NULL) / 3600;
     int real_hour_len;
 
     if ((real_hour_len = snprintf((char *) packet_hmac_data
@@ -143,14 +143,36 @@ static bool validate_server_mac(const struct server_response * restrict resp,
         goto error;
     }
 
-    const size_t actual_data_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN + real_hour_len;
+    size_t actual_data_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN + real_hour_len;
 
-    dump_hex(packet_hmac_data, actual_data_len);
+    //dump_hex(packet_hmac_data, actual_data_len);
 
+    //This technically isn't necessary if I save the previous time string from the initial request, but oh well
     if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data,
             actual_data_len, resp->response_mac)) {
-        goto error;
+        if ((real_hour_len = snprintf((char *) packet_hmac_data
+                        + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN,
+                        COBFS4_EPOCH_HOUR_LEN,
+                        "%lu", hr_time + 1)) < 0) {
+            goto error;
+        }
+        size_t actual_data_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN + real_hour_len;
+        if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data,
+                actual_data_len, resp->response_mac)) {
+            if ((real_hour_len = snprintf((char *) packet_hmac_data
+                            + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN,
+                            COBFS4_EPOCH_HOUR_LEN,
+                            "%lu", hr_time - 1)) < 0) {
+                goto error;
+            }
+            size_t actual_data_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN + real_hour_len;
+            if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data,
+                        actual_data_len, resp->response_mac)) {
+                goto error;
+            }
+        }
     }
+
     return true;
 error:
     return false;
@@ -268,13 +290,14 @@ int create_server_response(const struct shared_data * restrict shared,
     const size_t packet_hmac_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN
         + out_resp->padding_len + COBFS4_HMAC_LEN + COBFS4_EPOCH_HOUR_LEN;
 
-    dump_hex(packet_mac_data, packet_hmac_len);
+    //dump_hex(packet_mac_data, packet_hmac_len);
 
     if (hmac_gen(mac_key, sizeof(mac_key), packet_mac_data, packet_hmac_len, out_resp->response_mac)) {
         goto error;
     }
 
     EVP_PKEY_free(ephem_key);
+    EVP_PKEY_free(client_pubkey);
     return 0;
 
 error:
@@ -305,6 +328,8 @@ int client_process_server_response(EVP_PKEY * restrict self_keypair,
     if (CRYPTO_memcmp(out_ntor->auth_tag, resp->auth_tag, sizeof(COBFS4_AUTH_LEN)) != 0) {
         goto error;
     }
+
+    EVP_PKEY_free(server_pubkey);
     return 0;
 
 error:

@@ -8,5 +8,6 @@ int main(void) {
     test_ntor();
     test_handshake();
     test_aead();
+    test_seeded_random();
     return 0;
 }
