@@ -51,7 +51,14 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
-cobfs4
+bin/
 
-cscope.*
-tags
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
