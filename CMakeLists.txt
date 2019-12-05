@@ -84,6 +84,5 @@ target_compile_options(${PROJECT_NAME}_test
     PUBLIC "$<$<CONFIG:DEBUG>:${DEBUG_OPTIONS}>" "$<$<CONFIG:RELEASE>:${RELEASE_OPTIONS}>")
 target_compile_definitions(${PROJECT_NAME}_test PRIVATE "$<$<CONFIG:RELEASE>:NDEBUG>")
 target_include_directories(${PROJECT_NAME}_test PRIVATE ${INCLUDE_DIRS})
-#target_link_libraries(${PROJECT_NAME}_test PRIVATE OpenSSL::Crypto $<TARGET_OBJECTS:${PROJECT_NAME}>)
 target_link_libraries(${PROJECT_NAME}_test PRIVATE OpenSSL::Crypto ${PROJECT_NAME})
 target_link_options(${PROJECT_NAME}_test PRIVATE "$<$<CONFIG:RELEASE>:-s>")
