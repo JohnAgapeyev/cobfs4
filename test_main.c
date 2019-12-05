@@ -9,5 +9,6 @@ int main(void) {
     test_handshake();
     test_aead();
     test_seeded_random();
+    test_siphash();
     return 0;
 }
