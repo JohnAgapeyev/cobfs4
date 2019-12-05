@@ -7,29 +7,26 @@
 int hmac_gen(const uint8_t * restrict key, const size_t key_len,
         const uint8_t * restrict message, const size_t mesg_len,
         uint8_t hmac[static restrict COBFS4_HMAC_LEN]) {
+    uint8_t md_value[EVP_MAX_MD_SIZE];
+    size_t md_len = 0;
     const EVP_MD *md = EVP_sha512_256();
+    EVP_PKEY *pkey = NULL;
+
     EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
     if (!mdctx) {
-        return -1;
+        goto error;
     }
 
-    EVP_PKEY *pkey = EVP_PKEY_new_raw_private_key(EVP_PKEY_HMAC, NULL, key, key_len);
+    pkey = EVP_PKEY_new_raw_private_key(EVP_PKEY_HMAC, NULL, key, key_len);
     if (!pkey) {
-        goto free_md_ctx;
+        goto error;
     }
 
     if (!EVP_DigestSignInit(mdctx, NULL, md, NULL, pkey)) {
         goto error;
     }
 
-    if (!EVP_DigestSignUpdate(mdctx, message, mesg_len)) {
-        goto error;
-    }
-
-    uint8_t md_value[EVP_MAX_MD_SIZE];
-    size_t md_len = 0;
-
-    if (!EVP_DigestSignFinal(mdctx, md_value, &md_len)) {
+    if (!EVP_DigestSign(mdctx, md_value, &md_len, message, mesg_len)) {
         goto error;
     }
 
@@ -44,9 +41,12 @@ int hmac_gen(const uint8_t * restrict key, const size_t key_len,
     return 0;
 
 error:
-    EVP_PKEY_free(pkey);
-free_md_ctx:
-    EVP_MD_CTX_free(mdctx);
+    if (pkey) {
+        EVP_PKEY_free(pkey);
+    }
+    if (mdctx) {
+        EVP_MD_CTX_free(mdctx);
+    }
     OPENSSL_cleanse(hmac, COBFS4_HMAC_LEN);
     return -1;
 }
