@@ -36,6 +36,7 @@ set(LIBRARY_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/packet.c
     ${CMAKE_CURRENT_SOURCE_DIR}/src/random.c
     ${CMAKE_CURRENT_SOURCE_DIR}/src/siphash.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/stream.c
 )
 
 set(TEST_SOURCES
@@ -75,8 +76,6 @@ target_compile_definitions(${PROJECT_NAME} PUBLIC "$<$<CONFIG:RELEASE>:NDEBUG>")
 target_include_directories(${PROJECT_NAME} PUBLIC ${INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} PRIVATE OpenSSL::Crypto)
 target_link_options(${PROJECT_NAME} PRIVATE "$<$<CONFIG:RELEASE>:-s>")
-
-enable_testing()
 
 add_executable(${PROJECT_NAME}_test ${TEST_SOURCES})
 target_compile_options(${PROJECT_NAME}_test
