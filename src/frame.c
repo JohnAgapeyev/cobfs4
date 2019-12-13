@@ -1,7 +1,12 @@
 #include <openssl/evp.h>
+#include <arpa/inet.h>
+#include <stdint.h>
+#include <string.h>
 
 #include "constants.h"
 #include "frame.h"
+
+static const uint8_t * restrict aad = (const uint8_t *) "cobfs4_library_aad";
 
 int encrypt_aead(const uint8_t * restrict plaintext, size_t plain_len,
         const uint8_t * restrict aad, size_t aad_len,
@@ -99,3 +104,71 @@ error:
     EVP_CIPHER_CTX_free(ctx);
     return -1;
 }
+
+int make_frame(const uint8_t * restrict data, uint16_t data_len, uint16_t padding_len,
+        enum frame_type type,
+        const uint8_t key[static restrict COBFS4_SECRET_KEY_LEN],
+        const uint8_t iv[static restrict COBFS4_IV_LEN],
+        uint8_t out_frame[static restrict data_len + padding_len + COBFS4_FRAME_PAYLOAD_OVERHEAD]) {
+    uint8_t frame[COBFS4_MAX_FRAME_PAYLOAD_LEN];
+    uint8_t plaintext[COBFS4_MAX_FRAME_PAYLOAD_LEN];
+    int ciphertext_len = 0;
+
+    if (data_len + padding_len + COBFS4_FRAME_PAYLOAD_OVERHEAD > COBFS4_MAX_DATA_LEN) {
+        return -1;
+    }
+
+    plaintext[COBFS4_TAG_LEN] = (uint8_t) type;
+    plaintext[COBFS4_TAG_LEN + 1] = htons(data_len);
+
+    memset(plaintext, 0, sizeof(plaintext));
+    memcpy(plaintext + COBFS4_FRAME_PAYLOAD_OVERHEAD, data, data_len);
+
+    if ((ciphertext_len = encrypt_aead(plaintext,
+                data_len + padding_len + COBFS4_FRAME_PAYLOAD_OVERHEAD - COBFS4_TAG_LEN,
+                aad, strlen((const char *) aad), key, iv, frame + COBFS4_TAG_LEN, frame)) == -1) {
+        return -1;
+    }
+
+    memcpy(out_frame, frame, ciphertext_len);
+
+    return 0;
+}
+
+int decrypt_frame(const uint8_t frame[static restrict COBFS4_MAX_FRAME_PAYLOAD_LEN],
+        uint16_t frame_len,
+        const uint8_t key[static restrict COBFS4_SECRET_KEY_LEN],
+        const uint8_t iv[static restrict COBFS4_IV_LEN],
+        uint8_t out_data[static restrict COBFS4_MAX_DATA_LEN],
+        uint16_t * restrict out_data_len,
+        enum frame_type *type) {
+
+    uint8_t plaintext[COBFS4_MAX_FRAME_PAYLOAD_LEN];
+    uint16_t payload_len = 0;
+
+    if (frame_len > COBFS4_MAX_FRAME_PAYLOAD_LEN) {
+        return -1;
+    }
+    if (frame_len < COBFS4_FRAME_PAYLOAD_OVERHEAD) {
+        return -1;
+    }
+
+    if (decrypt_aead(frame + COBFS4_TAG_LEN, frame_len - COBFS4_TAG_LEN,
+                aad, strlen((const char *) aad), key, iv, frame, plaintext) == -1) {
+        return -1;
+    }
+
+    memcpy(&payload_len, plaintext + 1, sizeof(uint16_t));
+    payload_len = ntohs(payload_len);
+    if (payload_len > COBFS4_MAX_DATA_LEN) {
+        return -1;
+    }
+
+    *type = (enum frame_type)plaintext[0];
+    *out_data_len = payload_len;
+
+    memcpy(out_data, plaintext + 3, payload_len);
+
+    return 0;
+}
+
