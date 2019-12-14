@@ -113,16 +113,20 @@ int make_frame(const uint8_t * restrict data, uint16_t data_len, uint16_t paddin
     uint8_t frame[COBFS4_MAX_FRAME_PAYLOAD_LEN];
     uint8_t plaintext[COBFS4_MAX_FRAME_PAYLOAD_LEN];
     int ciphertext_len = 0;
+    uint16_t packet_data_len;
 
-    if (data_len + padding_len + COBFS4_FRAME_PAYLOAD_OVERHEAD > COBFS4_MAX_DATA_LEN) {
+    if (data_len + padding_len > COBFS4_MAX_DATA_LEN) {
+        return -1;
+    }
+    if (data_len + padding_len + COBFS4_FRAME_PAYLOAD_OVERHEAD > COBFS4_MAX_FRAME_PAYLOAD_LEN) {
         return -1;
     }
 
-    plaintext[COBFS4_TAG_LEN] = (uint8_t) type;
-    plaintext[COBFS4_TAG_LEN + 1] = htons(data_len);
-
     memset(plaintext, 0, sizeof(plaintext));
-    memcpy(plaintext + COBFS4_FRAME_PAYLOAD_OVERHEAD, data, data_len);
+    plaintext[0] = (uint8_t) type;
+    packet_data_len = htons(data_len);
+    memcpy(plaintext + 1, &packet_data_len, sizeof(packet_data_len));
+    memcpy(plaintext + 3, data, data_len);
 
     if ((ciphertext_len = encrypt_aead(plaintext,
                 data_len + padding_len + COBFS4_FRAME_PAYLOAD_OVERHEAD - COBFS4_TAG_LEN,
@@ -130,7 +134,7 @@ int make_frame(const uint8_t * restrict data, uint16_t data_len, uint16_t paddin
         return -1;
     }
 
-    memcpy(out_frame, frame, ciphertext_len);
+    memcpy(out_frame, frame, ciphertext_len + COBFS4_TAG_LEN);
 
     return 0;
 }
@@ -141,7 +145,7 @@ int decrypt_frame(const uint8_t frame[static restrict COBFS4_MAX_FRAME_PAYLOAD_L
         const uint8_t iv[static restrict COBFS4_IV_LEN],
         uint8_t out_data[static restrict COBFS4_MAX_DATA_LEN],
         uint16_t * restrict out_data_len,
-        enum frame_type *type) {
+        enum frame_type * restrict type) {
 
     uint8_t plaintext[COBFS4_MAX_FRAME_PAYLOAD_LEN];
     uint16_t payload_len = 0;

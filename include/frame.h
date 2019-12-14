@@ -28,6 +28,6 @@ int decrypt_frame(const uint8_t frame[static restrict COBFS4_MAX_FRAME_PAYLOAD_L
         const uint8_t iv[static restrict COBFS4_IV_LEN],
         uint8_t out_data[static restrict COBFS4_MAX_DATA_LEN],
         uint16_t * restrict out_data_len,
-        enum frame_type *type);
+        enum frame_type * restrict type);
 
 #endif

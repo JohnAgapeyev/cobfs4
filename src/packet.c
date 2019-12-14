@@ -11,6 +11,7 @@
 #include "hmac.h"
 #include "ecdh.h"
 #include "ntor.h"
+#include "frame.h"
 
 static inline void dump_hex(const uint8_t *data, size_t len) {
     (void)data;

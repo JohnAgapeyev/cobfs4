@@ -8,6 +8,7 @@ int main(void) {
     test_ntor();
     test_handshake();
     test_aead();
+    test_frame();
     test_seeded_random();
     test_siphash();
     return 0;
