@@ -51,7 +51,7 @@ void test_frame(void) {
     int good = 0;
     int bad = 0;
     int i;
-#if 1
+
     for (i = 0; i < 10000; ++i) {
         uint8_t key[COBFS4_SECRET_KEY_LEN];
         uint8_t iv[COBFS4_IV_LEN];
@@ -88,7 +88,6 @@ void test_frame(void) {
     }
 
     printf("Normal frame packet testing ran %d times\nResults:\nGood: %d\nBad: %d\n", i, good, bad);
-#endif
 
     good = 0;
     bad = 0;
