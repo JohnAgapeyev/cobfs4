@@ -2,6 +2,7 @@
 #define COBFS4_PACKET
 
 #include <stdint.h>
+#include <limits.h>
 
 #include "constants.h"
 #include "ntor.h"
@@ -25,6 +26,18 @@ struct server_response {
     uint8_t random_padding[COBFS4_SERVER_MAX_PAD_LEN];
 };
 
+struct stretched_key {
+    uint8_t server2client_key[COBFS4_SECRET_KEY_LEN];
+    uint8_t server2client_nonce_prefix[COBFS4_IV_LEN - sizeof(uint64_t)];
+    uint8_t server2client_siphash_key[COBFS4_SIPHASH_KEY_LEN];
+    uint8_t server2client_siphash_iv[COBFS4_SIPHASH_IV_LEN];
+
+    uint8_t client2server_key[COBFS4_SECRET_KEY_LEN];
+    uint8_t client2server_nonce_prefix[COBFS4_IV_LEN - sizeof(uint64_t)];
+    uint8_t client2server_siphash_key[COBFS4_SIPHASH_KEY_LEN];
+    uint8_t client2server_siphash_iv[COBFS4_SIPHASH_IV_LEN];
+};
+
 int create_client_request(EVP_PKEY * restrict self_keypair,
         const struct shared_data * restrict shared,
         struct client_request * restrict out_req);
@@ -32,11 +45,11 @@ int create_client_request(EVP_PKEY * restrict self_keypair,
 int create_server_response(const struct shared_data * restrict shared,
         const struct client_request * restrict incoming_req,
         struct server_response * restrict out_resp,
-        struct ntor_output * restrict out_ntor);
+        struct stretched_key * restrict out_keys);
 
 int client_process_server_response(EVP_PKEY * restrict self_keypair,
         const struct shared_data * restrict shared,
         struct server_response * restrict resp,
-        struct ntor_output * restrict out_ntor);
+        struct stretched_key * restrict out_keys);
 
 #endif /* COBFS4_PACKET */

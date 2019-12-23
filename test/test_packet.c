@@ -5,7 +5,6 @@
 #include "test.h"
 #include "packet.h"
 #include "ecdh.h"
-#include "ntor.h"
 #include "elligator.h"
 #include "constants.h"
 
@@ -21,8 +20,8 @@ void test_handshake(void) {
 
         uint8_t tmp_elligator[COBFS4_ELLIGATOR_LEN];
 
-        struct ntor_output client;
-        struct ntor_output server;
+        struct stretched_key client;
+        struct stretched_key server;
 
         struct client_request req;
         struct server_response resp;
@@ -57,14 +56,7 @@ void test_handshake(void) {
             continue;
         }
 
-        if (memcmp(client.auth_tag, server.auth_tag, COBFS4_AUTH_LEN) != 0) {
-            ++bad;
-            EVP_PKEY_free(shared.ntor);
-            EVP_PKEY_free(client_key);
-            continue;
-        }
-
-        if (memcmp(client.key_seed, server.key_seed, COBFS4_SEED_LEN) != 0) {
+        if (memcmp(&client, &server, sizeof(client)) != 0) {
             ++bad;
             EVP_PKEY_free(shared.ntor);
             EVP_PKEY_free(client_key);
