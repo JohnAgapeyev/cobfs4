@@ -7,13 +7,7 @@
 #define RNG_OUTPUT_COUNT 768
 #define USABLE_RNG_COUNT RNG_OUTPUT_COUNT - COBFS4_SECRET_KEY_LEN
 
-struct rng_state {
-    uint8_t chacha_key[COBFS4_SECRET_KEY_LEN];
-    uint8_t seeded : 1;
-};
-
 //Static variables explicitly get zeroed out on initialization
-static struct rng_state state;
 static const uint8_t nonce[COBFS4_IV_LEN];
 
 int encrypt_chacha(const uint8_t * restrict plaintext, size_t plain_len,
@@ -50,16 +44,16 @@ error:
     return -1;
 }
 
-void seed_random(const uint8_t seed[static COBFS4_SECRET_KEY_LEN]) {
-    memcpy(state.chacha_key, seed, COBFS4_SECRET_KEY_LEN);
-    state.seeded = 1;
+void seed_random(struct rng_state * restrict state, const uint8_t seed[static restrict COBFS4_SECRET_KEY_LEN]) {
+    memcpy(state->chacha_key, seed, COBFS4_SECRET_KEY_LEN);
+    state->seeded = 1;
 }
 
-int deterministic_random(uint8_t *buf, size_t buf_len) {
+int deterministic_random(struct rng_state * restrict state, uint8_t *buf, size_t buf_len) {
     static uint8_t input_buffer[RNG_OUTPUT_COUNT];
     uint8_t output_buffer[RNG_OUTPUT_COUNT];
 
-    if (!state.seeded) {
+    if (!state->seeded) {
         goto error;
     }
 
@@ -70,10 +64,10 @@ int deterministic_random(uint8_t *buf, size_t buf_len) {
     }
 
     while(buf_len != 0) {
-        if (encrypt_chacha(input_buffer, RNG_OUTPUT_COUNT, state.chacha_key, nonce, output_buffer) == -1) {
+        if (encrypt_chacha(input_buffer, RNG_OUTPUT_COUNT, state->chacha_key, nonce, output_buffer) == -1) {
             goto error;
         }
-        memcpy(state.chacha_key, output_buffer, COBFS4_SECRET_KEY_LEN);
+        memcpy(state->chacha_key, output_buffer, COBFS4_SECRET_KEY_LEN);
 
         const size_t write_len = (buf_len < USABLE_RNG_COUNT) ? buf_len : USABLE_RNG_COUNT;
         memcpy(buf, output_buffer + COBFS4_SECRET_KEY_LEN, write_len);

@@ -6,6 +6,7 @@
 #include <openssl/evp.h>
 #include <openssl/crypto.h>
 #include <openssl/rand.h>
+
 #include "packet.h"
 #include "elligator.h"
 #include "hmac.h"

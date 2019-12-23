@@ -3,8 +3,13 @@
 
 #include "constants.h"
 
-void seed_random(const uint8_t seed[static COBFS4_SECRET_KEY_LEN]);
+struct rng_state {
+    uint8_t chacha_key[COBFS4_SECRET_KEY_LEN];
+    uint8_t seeded : 1;
+};
 
-int deterministic_random(uint8_t *buf, size_t buf_len);
+void seed_random(struct rng_state * restrict state, const uint8_t seed[static restrict COBFS4_SECRET_KEY_LEN]);
+
+int deterministic_random(struct rng_state * restrict state, uint8_t *buf, size_t buf_len);
 
 #endif

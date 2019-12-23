@@ -20,6 +20,7 @@ struct server_response {
     uint8_t auth_tag[COBFS4_AUTH_LEN];
     uint8_t elligator_hmac[COBFS4_HMAC_LEN];
     uint8_t response_mac[COBFS4_HMAC_LEN];
+    uint8_t seed_frame[COBFS4_INLINE_SEED_FRAME_LEN];
     uint64_t padding_len;
     uint8_t random_padding[COBFS4_SERVER_MAX_PAD_LEN];
 };

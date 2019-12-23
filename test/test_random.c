@@ -20,28 +20,31 @@ void test_seeded_random(void) {
         uint8_t out3[10];
         uint8_t out4[10];
 
+        struct rng_state state1;
+        struct rng_state state2;
+
         RAND_bytes((unsigned char *) &seed, sizeof(seed));
 
-        seed_random(seed);
+        seed_random(&state1, seed);
 
-        if (deterministic_random(out1, sizeof(out1)) == -1) {
+        if (deterministic_random(&state1, out1, sizeof(out1)) == -1) {
             ++bad;
             continue;
         }
 
-        if (deterministic_random(out3, sizeof(out3)) == -1) {
+        if (deterministic_random(&state1, out3, sizeof(out3)) == -1) {
             ++bad;
             continue;
         }
 
-        seed_random(seed);
+        seed_random(&state2, seed);
 
-        if (deterministic_random(out2, sizeof(out2)) == -1) {
+        if (deterministic_random(&state2, out2, sizeof(out2)) == -1) {
             ++bad;
             continue;
         }
 
-        if (deterministic_random(out4, sizeof(out4)) == -1) {
+        if (deterministic_random(&state2, out4, sizeof(out4)) == -1) {
             ++bad;
             continue;
         }
