@@ -204,6 +204,7 @@ error:
 
 int create_server_response(const struct shared_data * restrict shared,
         const struct client_request * restrict incoming_req,
+        const uint8_t random_seed[static restrict COBFS4_SERVER_TIMING_SEED_LEN],
         struct server_response * restrict out_resp,
         struct stretched_key * restrict out_keys) {
     EVP_PKEY *client_pubkey = NULL;
@@ -212,6 +213,7 @@ int create_server_response(const struct shared_data * restrict shared,
     uint8_t packet_mac_data[COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN
         + COBFS4_SERVER_MAX_PAD_LEN + COBFS4_HMAC_LEN + COBFS4_EPOCH_HOUR_LEN];
     struct ntor_output ntor;
+    uint8_t seed_iv[COBFS4_IV_LEN];
 
     if (!validate_client_mac(incoming_req, shared)) {
         return -1;
@@ -271,9 +273,18 @@ int create_server_response(const struct shared_data * restrict shared,
         goto error;
     }
 
+    memcpy(seed_iv, out_keys->server2client_nonce_prefix, sizeof(out_keys->server2client_nonce_prefix));
+    memset(seed_iv + sizeof(out_keys->server2client_nonce_prefix), 0,
+            COBFS4_IV_LEN - sizeof(out_keys->server2client_nonce_prefix));
+    if (make_frame(random_seed, COBFS4_SERVER_TIMING_SEED_LEN, 0, TYPE_PRNG_SEED,
+                out_keys->server2client_key, seed_iv, out_resp->seed_frame)) {
+        goto error;
+    }
+
     EVP_PKEY_free(ephem_key);
     EVP_PKEY_free(client_pubkey);
     OPENSSL_cleanse(&ntor, sizeof(ntor));
+    OPENSSL_cleanse(seed_iv, sizeof(seed_iv));
     return 0;
 
 error:
@@ -281,14 +292,20 @@ error:
     EVP_PKEY_free(client_pubkey);
     OPENSSL_cleanse(out_resp, sizeof(*out_resp));
     OPENSSL_cleanse(&ntor, sizeof(ntor));
+    OPENSSL_cleanse(seed_iv, sizeof(seed_iv));
     return -1;
 }
 
 int client_process_server_response(EVP_PKEY * restrict self_keypair,
         const struct shared_data * restrict shared,
         struct server_response * restrict resp,
+        uint8_t out_server_timing_seed[static restrict COBFS4_SERVER_TIMING_SEED_LEN],
         struct stretched_key * restrict out_keys) {
     struct ntor_output ntor;
+    uint8_t seed_iv[COBFS4_IV_LEN];
+    enum frame_type type;
+    uint16_t plain_len;
+
     if (!validate_server_mac(resp, shared)) {
         return -1;
     }
@@ -308,6 +325,25 @@ int client_process_server_response(EVP_PKEY * restrict self_keypair,
 
     if (hkdf(expand_mesg, expand_mesg_len, expand_salt, expand_salt_len, ntor.key_seed, sizeof(ntor.key_seed),
                 (uint8_t *) out_keys, sizeof(*out_keys))) {
+        goto error;
+    }
+
+    memcpy(seed_iv, out_keys->server2client_nonce_prefix, sizeof(out_keys->server2client_nonce_prefix));
+    memset(seed_iv + sizeof(out_keys->server2client_nonce_prefix), 0,
+            COBFS4_IV_LEN - sizeof(out_keys->server2client_nonce_prefix));
+    if (decrypt_frame(resp->seed_frame, COBFS4_INLINE_SEED_FRAME_LEN,
+                out_keys->server2client_key, seed_iv,
+                out_server_timing_seed, &plain_len, &type)) {
+        goto error;
+    }
+
+    if (plain_len != COBFS4_SERVER_TIMING_SEED_LEN) {
+        goto error;
+    }
+
+    //Normally we ignore unknown types, but in the handshake seed frame?
+    //I have no idea how to ignore such dissonance
+    if (type != TYPE_PRNG_SEED) {
         goto error;
     }
 

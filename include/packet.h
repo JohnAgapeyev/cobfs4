@@ -44,12 +44,14 @@ int create_client_request(EVP_PKEY * restrict self_keypair,
 
 int create_server_response(const struct shared_data * restrict shared,
         const struct client_request * restrict incoming_req,
+        const uint8_t random_seed[static restrict COBFS4_SERVER_TIMING_SEED_LEN],
         struct server_response * restrict out_resp,
         struct stretched_key * restrict out_keys);
 
 int client_process_server_response(EVP_PKEY * restrict self_keypair,
         const struct shared_data * restrict shared,
         struct server_response * restrict resp,
+        uint8_t out_server_timing_seed[static restrict COBFS4_SERVER_TIMING_SEED_LEN],
         struct stretched_key * restrict out_keys);
 
 #endif /* COBFS4_PACKET */

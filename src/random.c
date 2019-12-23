@@ -49,7 +49,7 @@ void seed_random(struct rng_state * restrict state, const uint8_t seed[static re
     state->seeded = 1;
 }
 
-int deterministic_random(struct rng_state * restrict state, uint8_t *buf, size_t buf_len) {
+int deterministic_random(struct rng_state *state, uint8_t *buf, size_t buf_len) {
     static uint8_t input_buffer[RNG_OUTPUT_COUNT];
     uint8_t output_buffer[RNG_OUTPUT_COUNT];
 

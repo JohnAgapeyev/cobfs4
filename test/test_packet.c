@@ -1,4 +1,5 @@
 #include <openssl/evp.h>
+#include <openssl/rand.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -19,6 +20,11 @@ void test_handshake(void) {
         EVP_PKEY *client_key = ecdh_key_alloc();
 
         uint8_t tmp_elligator[COBFS4_ELLIGATOR_LEN];
+
+        uint8_t server_seed[COBFS4_SERVER_TIMING_SEED_LEN];
+        RAND_bytes(server_seed, sizeof(server_seed));
+
+        uint8_t recv_seed[COBFS4_SERVER_TIMING_SEED_LEN];
 
         struct stretched_key client;
         struct stretched_key server;
@@ -42,14 +48,14 @@ void test_handshake(void) {
             continue;
         }
 
-        if (create_server_response(&shared, &req, &resp, &server) == -1) {
+        if (create_server_response(&shared, &req, server_seed, &resp, &server) == -1) {
             ++bad;
             EVP_PKEY_free(shared.ntor);
             EVP_PKEY_free(client_key);
             continue;
         }
 
-        if (client_process_server_response(client_key, &shared, &resp, &client) == -1) {
+        if (client_process_server_response(client_key, &shared, &resp, recv_seed, &client) == -1) {
             ++bad;
             EVP_PKEY_free(shared.ntor);
             EVP_PKEY_free(client_key);
@@ -57,6 +63,13 @@ void test_handshake(void) {
         }
 
         if (memcmp(&client, &server, sizeof(client)) != 0) {
+            ++bad;
+            EVP_PKEY_free(shared.ntor);
+            EVP_PKEY_free(client_key);
+            continue;
+        }
+
+        if (memcmp(server_seed, recv_seed, sizeof(server_seed)) != 0) {
             ++bad;
             EVP_PKEY_free(shared.ntor);
             EVP_PKEY_free(client_key);
