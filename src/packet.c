@@ -13,38 +13,7 @@
 #include "ecdh.h"
 #include "ntor.h"
 #include "frame.h"
-
-static inline void dump_hex(const uint8_t *data, size_t len) {
-    (void)data;
-    (void)len;
-#if 0
-    printf("Dumping:\n");
-    for (size_t i = 0; i < len; ++i) {
-        printf("%02x", data[i]);
-    }
-    printf("\n");
-#endif
-}
-
-/*
- * Modified from:
- * https://stackoverflow.com/a/17554531
- */
-static inline uint64_t rand_interval(const uint64_t min, const uint64_t max) {
-    uint64_t r;
-    const uint64_t range = 1 + max - min;
-    const uint64_t buckets = UINT64_MAX / range;
-    const uint64_t limit = buckets * range;
-
-    /* Create equal size buckets all in a row, then fire randomly towards
-     * the buckets until you land in one of them. All buckets are equally
-     * likely. If you land off the end of the line of buckets, try again. */
-    do {
-        RAND_bytes((uint8_t *) &r, sizeof(r));
-    } while (r >= limit);
-
-    return min + (r / buckets);
-}
+#include "utils.h"
 
 /*
  * Returns a concatenation of the ntor public key and the identity key digest
@@ -87,8 +56,6 @@ static bool validate_client_mac(const struct client_request * restrict req,
     }
 
     size_t hmac_data_len = COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN + real_hour_len;
-
-    //dump_hex(packet_hmac_data, hmac_data_len);
 
     //This is dumb but it works
     if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac)) {
@@ -146,8 +113,6 @@ static bool validate_server_mac(const struct server_response * restrict resp,
     }
 
     size_t actual_data_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN + real_hour_len;
-
-    //dump_hex(packet_hmac_data, actual_data_len);
 
     //This technically isn't necessary if I save the previous time string from the initial request, but oh well
     if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data,
@@ -217,8 +182,6 @@ int create_client_request(EVP_PKEY * restrict self_keypair,
     memcpy(request_mac_data + COBFS4_ELLIGATOR_LEN + out_req->padding_len + COBFS4_HMAC_LEN, out_req->epoch_hours, real_hour_len);
 
     const size_t hmac_data_len = COBFS4_ELLIGATOR_LEN + out_req->padding_len + COBFS4_HMAC_LEN + real_hour_len;
-
-    //dump_hex(request_mac_data, hmac_data_len);
 
     if (hmac_gen(mac_key, sizeof(mac_key), request_mac_data,
                 hmac_data_len,
@@ -291,8 +254,6 @@ int create_server_response(const struct shared_data * restrict shared,
 
     const size_t packet_hmac_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN
         + out_resp->padding_len + COBFS4_HMAC_LEN + COBFS4_EPOCH_HOUR_LEN;
-
-    //dump_hex(packet_mac_data, packet_hmac_len);
 
     if (hmac_gen(mac_key, sizeof(mac_key), packet_mac_data, packet_hmac_len, out_resp->response_mac)) {
         goto error;

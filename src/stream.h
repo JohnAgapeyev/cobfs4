@@ -6,10 +6,12 @@
 
 #include "constants.h"
 #include "siphash.h"
+#include "random.h"
 
 struct cobfs4_stream {
     int fd;
     struct siphash_ctx siphash;
+    struct rng_state rng;
     uint8_t buffered_plaintext[COBFS4_MAX_DATA_LEN];
     uint8_t buffered_request[COBFS4_MAX_FRAME_LEN];
 };
