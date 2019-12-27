@@ -34,9 +34,11 @@ struct cobfs4_stream {
 };
 
 int cobfs4_server_init(struct cobfs4_stream *stream, int socket,
-        const uint8_t private_key[static restrict COBFS4_PUBKEY_LEN],
+        const uint8_t private_key[static restrict COBFS4_PRIVKEY_LEN],
         uint8_t * restrict identity_data, size_t identity_len);
-int cobfs4_client_init(struct cobfs4_stream *stream, int socket);
+int cobfs4_client_init(struct cobfs4_stream *stream, int socket,
+        const uint8_t server_pubkey[static restrict COBFS4_PUBKEY_LEN],
+        uint8_t * restrict identity_data, size_t identity_len);
 int cobfs4_read(struct cobfs4_stream * restrict stream, uint8_t buffer[static restrict COBFS4_MAX_DATA_LEN]);
 int cobfs4_write(struct cobfs4_stream * restrict stream, uint8_t * restrict buffer, size_t buf_len);
 

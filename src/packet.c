@@ -259,6 +259,10 @@ int create_server_response(const struct shared_data * restrict shared,
         goto error;
     }
 
+    if (elligator2(ephem_key, out_resp->elligator)) {
+        goto error;
+    }
+
     memcpy(out_resp->auth_tag, &ntor.auth_tag, COBFS4_AUTH_LEN);
     out_resp->padding_len = rand_interval(COBFS4_SERVER_MIN_PAD_LEN, COBFS4_SERVER_MAX_PAD_LEN);
     RAND_bytes(out_resp->random_padding, out_resp->padding_len);
