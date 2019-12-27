@@ -19,8 +19,6 @@ void test_handshake(void) {
     for (i = 0; i < 10000; ++i) {
         EVP_PKEY *client_key = ecdh_key_alloc();
 
-        uint8_t tmp_elligator[COBFS4_ELLIGATOR_LEN];
-
         uint8_t server_seed[COBFS4_SERVER_TIMING_SEED_LEN];
         RAND_bytes(server_seed, sizeof(server_seed));
 
@@ -35,11 +33,6 @@ void test_handshake(void) {
         struct shared_data shared;
         shared.ntor = ecdh_key_alloc();
         memcpy(&shared.identity_digest, identity_digest, strlen((char *) identity_digest));
-
-        while (elligator2(client_key, tmp_elligator) == -1) {
-            EVP_PKEY_free(client_key);
-            client_key = ecdh_key_alloc();
-        }
 
         if (create_client_request(client_key, &shared, &req) == -1) {
             ++bad;

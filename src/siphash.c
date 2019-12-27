@@ -4,6 +4,12 @@
 #include "constants.h"
 #include "siphash.h"
 
+void siphash_init(struct siphash_ctx * restrict ctx, const uint8_t key[static restrict COBFS4_SIPHASH_KEY_LEN],
+        const uint8_t iv[static restrict COBFS4_SIPHASH_IV_LEN]) {
+    memcpy(ctx->key, key, COBFS4_SIPHASH_KEY_LEN);
+    memcpy(ctx->iv, iv, COBFS4_SIPHASH_IV_LEN);
+}
+
 int siphash(struct siphash_ctx * restrict ctx, uint16_t * restrict out_mask) {
     const EVP_MD *md = EVP_sha512_256();
     uint8_t md_value[EVP_MAX_MD_SIZE];

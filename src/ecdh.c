@@ -4,12 +4,15 @@
 #include <string.h>
 
 #include "ecdh.h"
+#include "elligator.h"
 #include "hash.h"
 
 EVP_PKEY *ecdh_key_alloc(void) {
     EVP_PKEY_CTX *pctx = NULL;
     EVP_PKEY *pkey = NULL;
+    int retry_count = 0;
 
+retry:
     pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_X25519, NULL);
     if (!pctx) {
         return NULL;
@@ -31,6 +34,18 @@ EVP_PKEY *ecdh_key_alloc(void) {
         EVP_PKEY_free(pkey);
         EVP_PKEY_CTX_free(pctx);
         return NULL;
+    }
+
+    if (!elligator_valid(pkey)) {
+        //Limit random retries to a 1 in 2**128 chance of failure
+        if (++retry_count > 128) {
+            EVP_PKEY_free(pkey);
+            EVP_PKEY_CTX_free(pctx);
+            return NULL;
+        }
+        EVP_PKEY_free(pkey);
+        EVP_PKEY_CTX_free(pctx);
+        goto retry;
     }
 
     EVP_PKEY_CTX_free(pctx);

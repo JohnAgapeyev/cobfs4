@@ -28,11 +28,8 @@ void test_siphash(void) {
         RAND_bytes((unsigned char *) &key, sizeof(key));
         RAND_bytes((unsigned char *) &iv, sizeof(iv));
 
-        memcpy(ctx1.key, key, COBFS4_SIPHASH_KEY_LEN);
-        memcpy(ctx1.iv, iv, COBFS4_SIPHASH_IV_LEN);
-
-        memcpy(ctx2.key, key, COBFS4_SIPHASH_KEY_LEN);
-        memcpy(ctx2.iv, iv, COBFS4_SIPHASH_IV_LEN);
+        siphash_init(&ctx1, key, iv);
+        siphash_init(&ctx2, key, iv);
 
         if (siphash(&ctx1, &out1) == -1) {
             ++bad;

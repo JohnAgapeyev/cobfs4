@@ -159,6 +159,16 @@ int create_client_request(EVP_PKEY * restrict self_keypair,
     uint8_t request_mac_data[COBFS4_ELLIGATOR_LEN + COBFS4_HMAC_LEN
         + COBFS4_EPOCH_HOUR_LEN + COBFS4_CLIENT_MAX_PAD_LEN];
 
+    if (self_keypair == NULL) {
+        goto error;
+    }
+    if (shared == NULL) {
+        goto error;
+    }
+    if (out_req == NULL) {
+        goto error;
+    }
+
     if (elligator2(self_keypair, out_req->elligator)) {
         goto error;
     }
@@ -215,6 +225,22 @@ int create_server_response(const struct shared_data * restrict shared,
     struct ntor_output ntor;
     uint8_t seed_iv[COBFS4_IV_LEN];
 
+    if (shared == NULL) {
+        return -1;
+    }
+    if (incoming_req == NULL) {
+        return -1;
+    }
+    if (random_seed == NULL) {
+        return -1;
+    }
+    if (out_resp == NULL) {
+        return -1;
+    }
+    if (out_keys == NULL) {
+        return -1;
+    }
+
     if (!validate_client_mac(incoming_req, shared)) {
         return -1;
     }
@@ -222,14 +248,6 @@ int create_server_response(const struct shared_data * restrict shared,
     ephem_key = ecdh_key_alloc();
     if (!ephem_key) {
         return -1;
-    }
-
-    while(elligator2(ephem_key, out_resp->elligator) == -1) {
-        EVP_PKEY_free(ephem_key);
-        ephem_key = ecdh_key_alloc();
-        if (ephem_key == NULL) {
-            goto error;
-        }
     }
 
     client_pubkey = elligator2_inv(incoming_req->elligator);
@@ -305,6 +323,22 @@ int client_process_server_response(EVP_PKEY * restrict self_keypair,
     uint8_t seed_iv[COBFS4_IV_LEN];
     enum frame_type type;
     uint16_t plain_len;
+
+    if (self_keypair == NULL) {
+        return -1;
+    }
+    if (shared == NULL) {
+        return -1;
+    }
+    if (resp == NULL) {
+        return -1;
+    }
+    if (out_server_timing_seed == NULL) {
+        return -1;
+    }
+    if (out_keys == NULL) {
+        return -1;
+    }
 
     if (!validate_server_mac(resp, shared)) {
         return -1;

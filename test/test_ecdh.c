@@ -13,10 +13,21 @@ void test_ecdh(void) {
     int bad = 0;
     int i;
     for (i = 0; i < 10000; ++i) {
-        EVP_PKEY *first_key = ecdh_key_alloc();
-        EVP_PKEY *second_key = ecdh_key_alloc();
         uint8_t client_shared[COBFS4_PUBKEY_LEN];
         uint8_t server_shared[COBFS4_PUBKEY_LEN];
+
+        EVP_PKEY *first_key = ecdh_key_alloc();
+        if (first_key == NULL) {
+            ++bad;
+            continue;
+        }
+
+        EVP_PKEY *second_key = ecdh_key_alloc();
+        if (second_key == NULL) {
+            ++bad;
+            EVP_PKEY_free(first_key);
+            continue;
+        }
 
         if (ecdh_derive(first_key, second_key, client_shared)) {
             ++bad;

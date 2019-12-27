@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <openssl/evp.h>
@@ -664,3 +665,19 @@ free_pkey_ctx:
     return NULL;
 }
 
+bool elligator_valid(const EVP_PKEY * restrict pkey) {
+    uint8_t elligator[COBFS4_ELLIGATOR_LEN];
+    EVP_PKEY *res = NULL;
+
+    if (elligator2(pkey, elligator)) {
+        return false;
+    }
+
+    res = elligator2_inv(elligator);
+    if (res == NULL) {
+        return false;
+    }
+
+    EVP_PKEY_free(res);
+    return true;
+}

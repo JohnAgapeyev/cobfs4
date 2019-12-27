@@ -28,10 +28,18 @@ int cobfs4_client_init(struct cobfs4_stream *stream, int socket) {
     return 0;
 }
 
-int cobfs4_server_init(struct cobfs4_stream *stream, int socket) {
+int cobfs4_server_init(struct cobfs4_stream *stream, int socket,
+        const uint8_t private_key[static restrict COBFS4_PUBKEY_LEN],
+        uint8_t * restrict identity_data, size_t identity_len) {
     memset(stream, 0, sizeof(*stream));
     stream->fd = socket;
     stream->type = COBFS4_SERVER;
+
+
+
+    if (hash_data(identity_data, identity_len, stream->shared.identity_digest)) {
+        return -1;
+    }
 
     if (perform_server_handshake(stream)) {
         return -1;
