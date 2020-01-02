@@ -4,6 +4,10 @@
 #include <stdbool.h>
 #include <openssl/evp.h>
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <errno.h>
+
 #include "stream.h"
 #include "constants.h"
 #include "elligator.h"
@@ -11,8 +15,156 @@
 #include "packet.h"
 #include "ecdh.h"
 
+static int blocking_read(int sock, unsigned char * restrict buf, size_t buf_len) {
+    ssize_t ret;
+
+retry:
+    ret = recv(sock, buf, buf_len, 0);
+    if (ret == -1) {
+        switch(errno) {
+            case EAGAIN:
+            case EINTR:
+                goto retry;
+            case EBADF:
+            case ECONNREFUSED:
+            case EFAULT:
+            case EINVAL:
+            case ENOMEM:
+            case ENOTCONN:
+            case ENOTSOCK:
+                return -1;
+        }
+    } else if (ret == 0) {
+        return -1;
+    }
+
+    if ((size_t) ret < buf_len) {
+        buf_len -= ret;
+        buf += ret;
+        goto retry;
+    }
+
+    return ret;
+}
+
+static int nonblocking_read(int sock, unsigned char * restrict buf, size_t buf_len) {
+    ssize_t ret;
+
+retry:
+    ret = recv(sock, buf, buf_len, MSG_DONTWAIT);
+    if (ret == -1) {
+        switch(errno) {
+            case EAGAIN:
+                return 0;
+            case EINTR:
+                goto retry;
+            case EBADF:
+            case ECONNREFUSED:
+            case EFAULT:
+            case EINVAL:
+            case ENOMEM:
+            case ENOTCONN:
+            case ENOTSOCK:
+                return -1;
+        }
+    } else if (ret == 0) {
+        return -1;
+    }
+
+    if ((size_t) ret < buf_len) {
+        buf_len -= ret;
+        buf += ret;
+        goto retry;
+    }
+
+    return ret;
+}
+
+static int blocking_write(int sock, unsigned char * restrict buf, size_t buf_len) {
+    ssize_t ret;
+
+retry:
+    ret = send(sock, buf, buf_len, MSG_NOSIGNAL);
+    if (ret == -1) {
+        switch(errno) {
+            case EAGAIN:
+            case EINTR:
+                goto retry;
+            case EACCES:
+            case EALREADY:
+            case EBADF:
+            case ECONNRESET:
+            case EDESTADDRREQ:
+            case EFAULT:
+            case EINVAL:
+            case EISCONN:
+            case EMSGSIZE:
+            case ENOBUFS:
+            case ENOMEM:
+            case ENOTCONN:
+            case ENOTSOCK:
+            case EOPNOTSUPP:
+            case EPIPE:
+                return -1;
+        }
+    } else if (ret == 0) {
+        return -1;
+    }
+
+    if ((size_t) ret < buf_len) {
+        buf_len -= ret;
+        buf += ret;
+        goto retry;
+    }
+
+    return ret;
+}
+
+static int write_client_request(int fd, const struct client_request *req) {
+    unsigned char buf[COBFS4_MAX_HANDSHAKE_SIZE];
+    int ret;
+
+    memcpy(buf, req->elligator, COBFS4_ELLIGATOR_LEN);
+    memcpy(buf + COBFS4_ELLIGATOR_LEN, req->random_padding, req->padding_len);
+    memcpy(buf + COBFS4_ELLIGATOR_LEN + req->padding_len, req->elligator_hmac, COBFS4_HMAC_LEN);
+    memcpy(buf + COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN, req->request_mac, COBFS4_HMAC_LEN);
+
+    ret = blocking_write(fd, buf, COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN + COBFS4_HMAC_LEN);
+    if (ret <= 0) {
+        return -1;
+    }
+    return 0;
+}
+
+static int write_server_response(int fd, const struct server_response *resp) {
+    unsigned char buf[COBFS4_MAX_HANDSHAKE_SIZE];
+    int ret;
+
+    memcpy(buf, resp->elligator, COBFS4_ELLIGATOR_LEN);
+    memcpy(buf + COBFS4_ELLIGATOR_LEN, resp->auth_tag, COBFS4_AUTH_LEN);
+    memcpy(buf + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN, resp->seed_frame, COBFS4_INLINE_SEED_FRAME_LEN);
+    memcpy(buf + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + COBFS4_INLINE_SEED_FRAME_LEN,
+            resp->random_padding, resp->padding_len);
+    memcpy(buf + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + COBFS4_INLINE_SEED_FRAME_LEN + resp->padding_len,
+            resp->elligator_hmac, COBFS4_HMAC_LEN);
+    memcpy(buf + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + COBFS4_INLINE_SEED_FRAME_LEN + resp->padding_len + COBFS4_HMAC_LEN,
+            resp->response_mac, COBFS4_HMAC_LEN);
+
+    ret = blocking_write(fd, buf,
+            COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + COBFS4_INLINE_SEED_FRAME_LEN + resp->padding_len + COBFS4_HMAC_LEN);
+    if (ret <= 0) {
+        return -1;
+    }
+    return 0;
+}
+
+static int read_server_response(int fd, struct server_response *out_resp) {
+    unsigned char buf[COBFS4_MAX_HANDSHAKE_SIZE];
+    int ret;
+
+}
+
 static int perform_client_handshake(struct cobfs4_stream *stream) {
-    uint8_t message_buffer[COBFS4_MAX_HANDSHAKE_SIZE];
     struct client_request request;
     struct server_response response;
 
@@ -23,11 +175,22 @@ static int perform_client_handshake(struct cobfs4_stream *stream) {
         return -1;
     }
 
+    if (write_client_request(stream->fd, &request) <= 0) {
+        EVP_PKEY_free(ephem);
+        return -1;
+    }
+
+    if (read_server_response(stream->fd, &response) <= 0) {
+        EVP_PKEY_free(ephem);
+        return -1;
+    }
+
+    EVP_PKEY_free(ephem);
+
     return 0;
 }
 
 static int perform_server_handshake(struct cobfs4_stream *stream) {
-    uint8_t message_buffer[COBFS4_MAX_HANDSHAKE_SIZE];
     struct client_request request;
     struct server_response response;
     return 0;

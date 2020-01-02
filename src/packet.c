@@ -224,6 +224,7 @@ int create_server_response(const struct shared_data * restrict shared,
         + COBFS4_SERVER_MAX_PAD_LEN + COBFS4_HMAC_LEN + COBFS4_EPOCH_HOUR_LEN];
     struct ntor_output ntor;
     uint8_t seed_iv[COBFS4_IV_LEN];
+    uint8_t epoch_hours[COBFS4_EPOCH_HOUR_LEN + 1];
 
     if (shared == NULL) {
         return -1;
@@ -275,13 +276,22 @@ int create_server_response(const struct shared_data * restrict shared,
         goto error;
     }
 
+    //Get the number of hours since epoch
+    const uint64_t hr_time = time(NULL) / 3600;
+
+    //TODO: Fix this to properly handle hour disparity like the mac validation does
+    int real_hour_len;
+    if ((real_hour_len = snprintf((char *) epoch_hours, COBFS4_EPOCH_HOUR_LEN, "%lu", hr_time)) < 0) {
+        goto error;
+    }
+
     memcpy(packet_mac_data, out_resp->elligator, COBFS4_ELLIGATOR_LEN);
     memcpy(packet_mac_data + COBFS4_ELLIGATOR_LEN, &ntor.auth_tag, COBFS4_AUTH_LEN);
     memcpy(packet_mac_data + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN, out_resp->random_padding, out_resp->padding_len);
     memcpy(packet_mac_data + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + out_resp->padding_len,
             out_resp->elligator_hmac, COBFS4_HMAC_LEN);
     memcpy(packet_mac_data + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + out_resp->padding_len + COBFS4_HMAC_LEN,
-            incoming_req->epoch_hours, COBFS4_EPOCH_HOUR_LEN);
+            epoch_hours, COBFS4_EPOCH_HOUR_LEN);
 
     const size_t packet_hmac_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN
         + out_resp->padding_len + COBFS4_HMAC_LEN + COBFS4_EPOCH_HOUR_LEN;

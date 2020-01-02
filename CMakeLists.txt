@@ -72,7 +72,7 @@ add_library(${PROJECT_NAME} STATIC ${LIBRARY_SOURCES})
 target_compile_options(${PROJECT_NAME}
     PRIVATE ${WARNINGS}
     PUBLIC "$<$<CONFIG:DEBUG>:${DEBUG_OPTIONS}>" "$<$<CONFIG:RELEASE>:${RELEASE_OPTIONS}>")
-target_compile_definitions(${PROJECT_NAME} PUBLIC "$<$<CONFIG:RELEASE>:NDEBUG>" -D_POSIX_C_SOURCE=200809L)
+target_compile_definitions(${PROJECT_NAME} PUBLIC "$<$<CONFIG:RELEASE>:NDEBUG>")
 target_include_directories(${PROJECT_NAME} PUBLIC ${INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} PRIVATE OpenSSL::Crypto)
 target_link_options(${PROJECT_NAME} PRIVATE "$<$<CONFIG:RELEASE>:-s>")
@@ -81,7 +81,7 @@ add_executable(${PROJECT_NAME}_test ${TEST_SOURCES})
 target_compile_options(${PROJECT_NAME}_test
     PRIVATE ${WARNINGS}
     PUBLIC "$<$<CONFIG:DEBUG>:${DEBUG_OPTIONS}>" "$<$<CONFIG:RELEASE>:${RELEASE_OPTIONS}>")
-target_compile_definitions(${PROJECT_NAME}_test PRIVATE "$<$<CONFIG:RELEASE>:NDEBUG>" -D_POSIX_C_SOURCE=200809L)
+target_compile_definitions(${PROJECT_NAME}_test PRIVATE "$<$<CONFIG:RELEASE>:NDEBUG>")
 target_include_directories(${PROJECT_NAME}_test PRIVATE ${INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME}_test PRIVATE OpenSSL::Crypto ${PROJECT_NAME})
 target_link_options(${PROJECT_NAME}_test PRIVATE "$<$<CONFIG:RELEASE>:-s>")
