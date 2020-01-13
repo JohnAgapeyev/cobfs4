@@ -18,17 +18,18 @@ enum connection_type {
 struct cobfs4_stream {
     int fd;
     enum connection_type type;
-    struct siphash_ctx siphash;
+    struct siphash_ctx read_siphash;
+    struct siphash_ctx write_siphash;
     struct rng_state rng;
     struct shared_data shared;
     uint8_t read_buffer[COBFS4_MAX_DATA_LEN];
     uint8_t write_buffer[COBFS4_MAX_FRAME_LEN];
 
     uint8_t read_key[COBFS4_SECRET_KEY_LEN];
-    uint8_t read_nonce_prefix[COBFS4_IV_LEN - sizeof(uint64_t)];
+    uint8_t read_nonce_prefix[COBFS4_NONCE_PREFIX_LEN];
 
     uint8_t write_key[COBFS4_SECRET_KEY_LEN];
-    uint8_t write_nonce_prefix[COBFS4_IV_LEN - sizeof(uint64_t)];
+    uint8_t write_nonce_prefix[COBFS4_NONCE_PREFIX_LEN];
 
     bool initialized;
 };

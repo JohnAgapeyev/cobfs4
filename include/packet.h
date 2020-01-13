@@ -28,12 +28,12 @@ struct server_response {
 
 struct stretched_key {
     uint8_t server2client_key[COBFS4_SECRET_KEY_LEN];
-    uint8_t server2client_nonce_prefix[COBFS4_IV_LEN - sizeof(uint64_t)];
+    uint8_t server2client_nonce_prefix[COBFS4_NONCE_PREFIX_LEN];
     uint8_t server2client_siphash_key[COBFS4_SIPHASH_KEY_LEN];
     uint8_t server2client_siphash_iv[COBFS4_SIPHASH_IV_LEN];
 
     uint8_t client2server_key[COBFS4_SECRET_KEY_LEN];
-    uint8_t client2server_nonce_prefix[COBFS4_IV_LEN - sizeof(uint64_t)];
+    uint8_t client2server_nonce_prefix[COBFS4_NONCE_PREFIX_LEN];
     uint8_t client2server_siphash_key[COBFS4_SIPHASH_KEY_LEN];
     uint8_t client2server_siphash_iv[COBFS4_SIPHASH_IV_LEN];
 };
