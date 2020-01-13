@@ -21,21 +21,6 @@ static size_t expand_mesg_len = 35;
 static const uint8_t *expand_salt = (uint8_t *) "ntor-curve25519-sha256-1:key_extract";
 static size_t expand_salt_len = 36;
 
-/*
- * Returns a concatenation of the ntor public key and the identity key digest
- * This is used as an HMAC key throughout, so it's useful to have.
- */
-static inline bool make_shared_data(const struct shared_data * restrict shared,
-        uint8_t out_shared_data[static restrict COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN]) {
-    size_t tmp_len = COBFS4_PUBKEY_LEN;
-    if (!EVP_PKEY_get_raw_public_key(shared->ntor, out_shared_data, &tmp_len)) {
-        OPENSSL_cleanse(out_shared_data, COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN);
-        return false;
-    }
-    memcpy(out_shared_data + COBFS4_PUBKEY_LEN, shared->identity_digest, COBFS4_HASH_LEN);
-    return true;
-}
-
 static bool validate_client_mac(const struct client_request * restrict req,
         const struct shared_data * restrict shared) {
     uint8_t mac_key[COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN];

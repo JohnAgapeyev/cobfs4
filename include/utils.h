@@ -2,6 +2,7 @@
 #define COBFS4_UTILS
 
 #include <openssl/rand.h>
+#include <openssl/evp.h>
 
 #include "random.h"
 
@@ -33,7 +34,8 @@ static inline uint64_t rand_interval(const uint64_t min, const uint64_t max) {
     return min + (r / buckets);
 }
 
-static inline uint64_t deterministic_rand_interval(struct rng_state *state, const uint64_t min, const uint64_t max) {
+static inline uint64_t deterministic_rand_interval(struct rng_state *state,
+        const uint64_t min, const uint64_t max) {
     uint64_t r;
     const uint64_t range = 1 + max - min;
     const uint64_t buckets = UINT64_MAX / range;
@@ -47,6 +49,37 @@ static inline uint64_t deterministic_rand_interval(struct rng_state *state, cons
     } while (r >= limit);
 
     return min + (r / buckets);
+}
+
+/*
+ * Returns a concatenation of the ntor public key and the identity key digest
+ * This is used as an HMAC key throughout, so it's useful to have.
+ */
+static inline bool make_shared_data(const struct shared_data * restrict shared,
+        uint8_t out_shared_data[static restrict COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN]) {
+    size_t tmp_len = COBFS4_PUBKEY_LEN;
+    if (!EVP_PKEY_get_raw_public_key(shared->ntor, out_shared_data, &tmp_len)) {
+        OPENSSL_cleanse(out_shared_data, COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN);
+        return false;
+    }
+    memcpy(out_shared_data + COBFS4_PUBKEY_LEN, shared->identity_digest, COBFS4_HASH_LEN);
+    return true;
+}
+
+static inline void *cobfs4_memmem(const void *haystack, size_t haystack_len,
+        const void *needle, size_t needle_len) {
+    if (haystack == NULL || haystack_len == 0) {
+        return NULL;
+    }
+    if (needle == NULL || needle_len == 0) {
+        return NULL;
+    }
+    for (char *h; haystack_len >= needle_len; ++h, --haystack_len) {
+        if (memcmp(h, needle, needle_len) == 0) {
+            return h;
+        }
+    }
+    return NULL;
 }
 
 
