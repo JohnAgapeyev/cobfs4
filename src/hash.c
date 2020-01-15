@@ -9,7 +9,7 @@ int hash_data(uint8_t * restrict mesg, size_t mesg_len, uint8_t out_buf[static r
     EVP_MD_CTX *ctx = EVP_MD_CTX_new();
 
     if (!ctx) {
-        return -1;
+        goto error;
     }
 
     if (!EVP_DigestInit_ex(ctx, EVP_sha512_256(), NULL)) {
@@ -29,6 +29,8 @@ int hash_data(uint8_t * restrict mesg, size_t mesg_len, uint8_t out_buf[static r
 
 error:
     OPENSSL_cleanse(out_buf, COBFS4_HASH_LEN);
-    EVP_MD_CTX_free(ctx);
+    if (ctx) {
+        EVP_MD_CTX_free(ctx);
+    }
     return -1;
 }

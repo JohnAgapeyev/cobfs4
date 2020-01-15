@@ -10,5 +10,6 @@ void test_aead(void);
 void test_frame(void);
 void test_seeded_random(void);
 void test_siphash(void);
+void test_stream(void);
 
 #endif /* COBFS4_TEST_HEADER */

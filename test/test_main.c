@@ -2,6 +2,7 @@
 #include "test.h"
 
 int main(void) {
+#if 1
     test_elligator();
     test_hmac();
     test_ecdh();
@@ -11,5 +12,8 @@ int main(void) {
     test_frame();
     test_seeded_random();
     test_siphash();
+#else
+    test_stream();
+#endif
     return 0;
 }

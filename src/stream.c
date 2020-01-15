@@ -390,7 +390,6 @@ error:
 static int perform_server_handshake(struct cobfs4_stream *stream) {
     struct client_request request;
     struct server_response response;
-    uint8_t timing_seed[COBFS4_SERVER_TIMING_SEED_LEN];
     struct stretched_key keys;
     EVP_PKEY *ephem = NULL;
 
@@ -399,13 +398,11 @@ static int perform_server_handshake(struct cobfs4_stream *stream) {
         goto error;
     }
 
-    RAND_bytes(timing_seed, sizeof(timing_seed));
-
     if (read_client_request(stream->fd, &stream->shared, &request) <= 0) {
         goto error;
     }
 
-    if (create_server_response(&stream->shared, &request, timing_seed, &response, &keys) <= 0) {
+    if (create_server_response(&stream->shared, &request, stream->timing_seed, &response, &keys) <= 0) {
         goto error;
     }
 
@@ -414,7 +411,6 @@ static int perform_server_handshake(struct cobfs4_stream *stream) {
     }
 
     EVP_PKEY_free(ephem);
-    OPENSSL_cleanse(timing_seed, sizeof(timing_seed));
     OPENSSL_cleanse(&keys, sizeof(keys));
     return 0;
 
@@ -422,12 +418,11 @@ error:
     if (ephem) {
         EVP_PKEY_free(ephem);
     }
-    OPENSSL_cleanse(timing_seed, sizeof(timing_seed));
     OPENSSL_cleanse(&keys, sizeof(keys));
     return -1;
 }
 
-int cobfs4_client_init(struct cobfs4_stream *stream, int socket,
+int cobfs4_client_init(struct cobfs4_stream * restrict stream, int socket,
         const uint8_t server_pubkey[static restrict COBFS4_PUBKEY_LEN],
         uint8_t * restrict identity_data, size_t identity_len) {
     EVP_PKEY *server_ntor = NULL;
@@ -438,32 +433,37 @@ int cobfs4_client_init(struct cobfs4_stream *stream, int socket,
 
     server_ntor = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519, NULL, server_pubkey, COBFS4_PUBKEY_LEN);
     if (server_ntor == NULL) {
-        return -1;
+        goto error;
     }
 
     if (!elligator_valid(server_ntor)) {
-        EVP_PKEY_free(server_ntor);
-        return -1;
+        goto error;
     }
 
     stream->shared.ntor = server_ntor;
 
     if (hash_data(identity_data, identity_len, stream->shared.identity_digest)) {
-        EVP_PKEY_free(server_ntor);
-        return -1;
+        goto error;
     }
 
     if (perform_client_handshake(stream)) {
-        return -1;
+        goto error;
     }
 
     stream->initialized = true;
     return 0;
+
+error:
+    if (server_ntor) {
+        EVP_PKEY_free(server_ntor);
+    }
+    return -1;
 }
 
-int cobfs4_server_init(struct cobfs4_stream *stream, int socket,
+int cobfs4_server_init(struct cobfs4_stream * restrict stream, int socket,
         const uint8_t private_key[static restrict COBFS4_PRIVKEY_LEN],
-        uint8_t * restrict identity_data, size_t identity_len) {
+        uint8_t * restrict identity_data, size_t identity_len,
+        const uint8_t timing_seed[static restrict COBFS4_SERVER_TIMING_SEED_LEN]) {
     EVP_PKEY *server_ntor = NULL;
 
     memset(stream, 0, sizeof(*stream));
@@ -472,28 +472,33 @@ int cobfs4_server_init(struct cobfs4_stream *stream, int socket,
 
     server_ntor = EVP_PKEY_new_raw_private_key(EVP_PKEY_X25519, NULL, private_key, COBFS4_PRIVKEY_LEN);
     if (server_ntor == NULL) {
-        return -1;
+        goto error;
     }
 
     if (!elligator_valid(server_ntor)) {
-        EVP_PKEY_free(server_ntor);
-        return -1;
+        goto error;
     }
 
     stream->shared.ntor = server_ntor;
 
     if (hash_data(identity_data, identity_len, stream->shared.identity_digest)) {
-        EVP_PKEY_free(server_ntor);
-        return -1;
+        goto error;
     }
 
+    memcpy(stream->timing_seed, timing_seed, COBFS4_SERVER_TIMING_SEED_LEN);
+
     if (perform_server_handshake(stream)) {
-        EVP_PKEY_free(server_ntor);
-        return -1;
+        goto error;
     }
 
     stream->initialized = true;
     return 0;
+
+error:
+    if (server_ntor) {
+        EVP_PKEY_free(server_ntor);
+    }
+    return -1;
 }
 
 int cobfs4_read(struct cobfs4_stream * restrict stream, uint8_t buffer[static restrict COBFS4_MAX_DATA_LEN]) {

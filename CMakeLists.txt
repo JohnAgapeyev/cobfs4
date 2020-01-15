@@ -49,6 +49,7 @@ set(TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/test/test_packet.c
     ${CMAKE_CURRENT_SOURCE_DIR}/test/test_random.c
     ${CMAKE_CURRENT_SOURCE_DIR}/test/test_siphash.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/test/test_stream.c
 )
 
 set(INCLUDE_DIRS
@@ -67,6 +68,8 @@ endif()
 #set(OPENSSL_USE_STATIC_LIBS TRUE)
 find_package(OpenSSL 1.1.1 REQUIRED)
 
+find_package(Threads REQUIRED)
+
 add_library(${PROJECT_NAME} STATIC ${LIBRARY_SOURCES})
 
 target_compile_options(${PROJECT_NAME}
@@ -83,5 +86,5 @@ target_compile_options(${PROJECT_NAME}_test
     PUBLIC "$<$<CONFIG:DEBUG>:${DEBUG_OPTIONS}>" "$<$<CONFIG:RELEASE>:${RELEASE_OPTIONS}>")
 target_compile_definitions(${PROJECT_NAME}_test PRIVATE "$<$<CONFIG:RELEASE>:NDEBUG>")
 target_include_directories(${PROJECT_NAME}_test PRIVATE ${INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME}_test PRIVATE OpenSSL::Crypto ${PROJECT_NAME})
+target_link_libraries(${PROJECT_NAME}_test PRIVATE OpenSSL::Crypto Threads::Threads ${PROJECT_NAME})
 target_link_options(${PROJECT_NAME}_test PRIVATE "$<$<CONFIG:RELEASE>:-s>")
