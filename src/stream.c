@@ -34,9 +34,11 @@ retry:
             case ENOMEM:
             case ENOTCONN:
             case ENOTSOCK:
+                //fprintf(stderr, "Returning %d %s : %d\n", ret, __func__, __LINE__);
                 return -1;
         }
     } else if (ret == 0) {
+        //fprintf(stderr, "Returning %d %s : %d\n", ret, __func__, __LINE__);
         return -1;
     }
 
@@ -46,6 +48,7 @@ retry:
         goto retry;
     }
 
+    //fprintf(stderr, "Returning %d %s : %d\n", ret, __func__, __LINE__);
     return ret;
 }
 
@@ -67,11 +70,14 @@ retry:
             case ENOMEM:
             case ENOTCONN:
             case ENOTSOCK:
+                //fprintf(stderr, "Returning %d %s : %d\n", ret, __func__, __LINE__);
                 return -1;
         }
     } else if (ret == 0) {
+        //fprintf(stderr, "Returning %d %s : %d\n", ret, __func__, __LINE__);
         return -1;
     }
+    //fprintf(stderr, "Returning %d %s : %d\n", ret, __func__, __LINE__);
     return ret;
 }
 
@@ -112,7 +118,7 @@ retry:
         goto retry;
     }
 
-    return ret;
+    return 0;
 }
 
 static int write_client_request(int fd, const struct client_request *req) {
@@ -124,8 +130,13 @@ static int write_client_request(int fd, const struct client_request *req) {
     memcpy(buf + COBFS4_ELLIGATOR_LEN + req->padding_len, req->elligator_hmac, COBFS4_HMAC_LEN);
     memcpy(buf + COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN, req->request_mac, COBFS4_HMAC_LEN);
 
+    printf("Dumping: 1\n");
+    dump_hex(req->elligator_hmac, sizeof(req->elligator_hmac));
+    printf("Dumping: 2\n");
+    dump_hex(buf, COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN + COBFS4_HMAC_LEN);
     ret = blocking_write(fd, buf, COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN + COBFS4_HMAC_LEN);
-    if (ret <= 0) {
+    if (ret < 0) {
+        //fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         return -1;
     }
     return 0;
@@ -147,7 +158,7 @@ static int write_server_response(int fd, const struct server_response *resp) {
 
     ret = blocking_write(fd, buf,
             COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + COBFS4_INLINE_SEED_FRAME_LEN + resp->padding_len + COBFS4_HMAC_LEN);
-    if (ret <= 0) {
+    if (ret < 0) {
         return -1;
     }
     return 0;
@@ -167,11 +178,16 @@ static int read_server_response(int fd, const struct shared_data * restrict shar
     if (!make_shared_data(shared, shared_buf)) {
         goto error;
     }
+    printf("Client side shared data\n");
+    dump_hex(shared_buf, sizeof(shared_buf));
 
     ret = hmac_gen(shared_buf, sizeof(shared_buf), buf, COBFS4_ELLIGATOR_LEN, marker);
-    if (ret <= 0) {
+    if (ret < 0) {
         goto error;
     }
+
+    printf("Marker:\n");
+    dump_hex(marker, sizeof(marker));
 
     ret = blocking_read(fd, buf, COBFS4_SERVER_HANDSHAKE_LEN);
     if (ret <= 0) {
@@ -257,22 +273,27 @@ static int perform_client_handshake(struct cobfs4_stream *stream) {
 
     ephem = ecdh_key_alloc();
     if (ephem == NULL) {
+        //fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     }
 
     if (create_client_request(ephem, &stream->shared, &request)) {
+        //fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     }
 
-    if (write_client_request(stream->fd, &request) <= 0) {
+    if (write_client_request(stream->fd, &request)) {
+        //fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     }
 
-    if (read_server_response(stream->fd, &stream->shared, &response) <= 0) {
+    if (read_server_response(stream->fd, &stream->shared, &response)) {
+        //fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     }
 
-    if (client_process_server_response(ephem, &stream->shared, &response, timing_seed, &keys) <= 0) {
+    if (client_process_server_response(ephem, &stream->shared, &response, timing_seed, &keys)) {
+        //fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     }
 
@@ -309,17 +330,25 @@ static int read_client_request(int fd, const struct shared_data * restrict share
     uint8_t *marker_location;
     size_t marker_index;
 
+    memset(buf, 0, sizeof(buf));
+
     if (!make_shared_data(shared, shared_buf)) {
+        fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     }
 
+    printf("Server side shared data\n");
+    dump_hex(shared_buf, sizeof(shared_buf));
+
     ret = hmac_gen(shared_buf, sizeof(shared_buf), buf, COBFS4_ELLIGATOR_LEN, marker);
-    if (ret <= 0) {
+    if (ret < 0) {
+        fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     }
 
     ret = blocking_read(fd, buf, COBFS4_CLIENT_HANDSHAKE_LEN);
     if (ret <= 0) {
+        fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     }
     bytes_read += COBFS4_CLIENT_HANDSHAKE_LEN;
@@ -327,6 +356,7 @@ static int read_client_request(int fd, const struct shared_data * restrict share
 retry:
     ret = nonblocking_read(fd, buf + bytes_read, COBFS4_MAX_HANDSHAKE_SIZE - bytes_read);
     if (ret < 0) {
+        fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     } else if (ret == 0) {
         //We hit EAGAIN
@@ -343,14 +373,20 @@ retry:
     }
 
 done:
+    printf("Dumping buffer\n");
+    dump_hex(buf, bytes_read);
+    printf("Dumping input\n");
+    dump_hex(marker, sizeof(marker));
     marker_location = cobfs4_memmem(buf, bytes_read, marker, sizeof(marker));
     if (marker_location == NULL) {
         if (bytes_read == COBFS4_MAX_HANDSHAKE_SIZE) {
             //This is not a valid handshake
+            fprintf(stderr, "%s : %d\n", __func__, __LINE__);
             goto error;
         }
         if (bytes_read == old_bytes_read) {
             //We hit EAGAIN on our last retry without reading anything new
+            fprintf(stderr, "%s : %d\n", __func__, __LINE__);
             goto error;
         }
         old_bytes_read = bytes_read;
@@ -362,6 +398,7 @@ done:
     if ((bytes_read - marker_index) < COBFS4_HMAC_LEN) {
         ret = blocking_read(fd, buf + bytes_read, COBFS4_HMAC_LEN - (bytes_read - marker_index));
         if (ret <= 0) {
+            fprintf(stderr, "%s : %d\n", __func__, __LINE__);
             goto error;
         }
         bytes_read += ret;
@@ -369,6 +406,7 @@ done:
         //We read more data than expected
         //TODO: Abstract this whole thing out for client/server and check if we're the server
         //the client should never send trailing garbage to the server, since it doesn't have the keys yet
+        fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     }
 
@@ -398,15 +436,15 @@ static int perform_server_handshake(struct cobfs4_stream *stream) {
         goto error;
     }
 
-    if (read_client_request(stream->fd, &stream->shared, &request) <= 0) {
+    if (read_client_request(stream->fd, &stream->shared, &request)) {
         goto error;
     }
 
-    if (create_server_response(&stream->shared, &request, stream->timing_seed, &response, &keys) <= 0) {
+    if (create_server_response(&stream->shared, &request, stream->timing_seed, &response, &keys)) {
         goto error;
     }
 
-    if (write_server_response(stream->fd, &response) <= 0) {
+    if (write_server_response(stream->fd, &response)) {
         goto error;
     }
 

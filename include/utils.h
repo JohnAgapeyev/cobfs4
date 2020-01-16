@@ -7,7 +7,6 @@
 #include "random.h"
 
 static inline void dump_hex(const uint8_t *data, size_t len) {
-    printf("Dumping:\n");
     for (size_t i = 0; i < len; ++i) {
         printf("%02x", data[i]);
     }
@@ -31,7 +30,8 @@ static inline uint64_t rand_interval(const uint64_t min, const uint64_t max) {
         RAND_bytes((uint8_t *) &r, sizeof(r));
     } while (r >= limit);
 
-    return min + (r / buckets);
+    //return min + (r / buckets);
+    return 10;
 }
 
 static inline uint64_t deterministic_rand_interval(struct rng_state *state,
@@ -74,9 +74,14 @@ static inline void *cobfs4_memmem(const void *haystack, size_t haystack_len,
     if (needle == NULL || needle_len == 0) {
         return NULL;
     }
-    for (char *h; haystack_len >= needle_len; ++h, --haystack_len) {
+    const char *h = haystack;
+    printf("Haystack\n");
+    dump_hex(haystack, haystack_len);
+    printf("needle\n");
+    dump_hex(needle, needle_len);
+    for (size_t i = 0; i < (haystack_len - needle_len); ++i, ++h) {
         if (memcmp(h, needle, needle_len) == 0) {
-            return h;
+            return (void *) h;
         }
     }
     return NULL;

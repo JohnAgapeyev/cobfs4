@@ -6,7 +6,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <unistd.h>
-#include <pthread.h>
+#include <semaphore.h>
 
 #include "cobfs4.h"
 #include "test.h"
@@ -24,8 +24,7 @@ struct stream_test_ctx {
     uintptr_t (*test_case)(struct cobfs4_stream *);
 };
 
-static pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+static sem_t sem;
 
 void *client_thread_routine(void *ctx) {
     struct stream_test_ctx *test = ctx;
@@ -38,15 +37,20 @@ void *client_thread_routine(void *ctx) {
     servaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     servaddr.sin_port = htons(12345);
 
-    pthread_mutex_lock(&mut);
+    setsockopt(client_socket, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
+
+    sem_wait(&sem);
 
     ret = connect(client_socket, (struct sockaddr *)&servaddr, sizeof(servaddr));
-    printf("1 %d %d\n", ret, errno);
+    //printf("1 %d %d\n", ret, errno);
 
-    pthread_mutex_unlock(&mut);
+    sem_post(&sem);
 
-#if 0
+
+#if 1
     if (cobfs4_client_init(test->stream, client_socket, test->server_pub, test->identity, sizeof(test->identity)) <= 0) {
+        printf("Badness\n");
+        close(client_socket);
         return (void *)-1;
     }
 #else
@@ -76,18 +80,23 @@ void *server_thread_routine(void *ctx) {
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servaddr.sin_port = htons(12345);
 
-    ret = bind(listen_socket, (struct sockaddr *)&servaddr, sizeof(servaddr));
-    printf("4 %d\n", ret);
-    ret = listen(listen_socket, 5);
-    printf("5 %d\n", ret);
+    setsockopt(listen_socket, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
 
-    pthread_mutex_unlock(&mut);
+    ret = bind(listen_socket, (struct sockaddr *)&servaddr, sizeof(servaddr));
+    //printf("4 %d\n", ret);
+    ret = listen(listen_socket, 5);
+    //printf("5 %d\n", ret);
+
+    sem_post(&sem);
 
     int server_socket = accept(listen_socket, NULL, NULL);
-    printf("8 %d\n", server_socket);
+    //printf("8 %d\n", server_socket);
 
-#if 0
+#if 1
     if (cobfs4_server_init(test->stream, server_socket, test->server_priv, test->identity, sizeof(test->identity), test->timing_seed) <= 0) {
+        printf("Server Badness\n");
+        close(server_socket);
+        close(listen_socket);
         return (void *) -1;
     }
 #else
@@ -160,14 +169,16 @@ void test_stream(void) {
         client_ctx.stream = &client_stream;
         server_ctx.stream = &server_stream;
 
-        pthread_create(&server_thread, NULL, server_thread_routine, &server_ctx);
+        sem_init(&sem, 0, 0);
 
-        pthread_mutex_lock(&mut);
+        pthread_create(&server_thread, NULL, server_thread_routine, &server_ctx);
 
         pthread_create(&client_thread, NULL, client_thread_routine, &client_ctx);
 
         pthread_join(client_thread, NULL);
         pthread_join(server_thread, NULL);
+
+        sem_destroy(&sem);
 
         if (memcmp(client_stream.read_key, server_stream.write_key, sizeof(client_stream.read_key)) != 0) {
             ++bad;
