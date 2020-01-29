@@ -126,7 +126,8 @@ void test_stream(void) {
     int bad = 0;
     int i;
 
-    for (i = 0; i < 10000; ++i) {
+    //for (i = 0; i < 10000; ++i) {
+    for (i = 0; i < 1; ++i) {
         struct stream_test_ctx client_ctx;
         struct stream_test_ctx server_ctx;
 
@@ -145,6 +146,9 @@ void test_stream(void) {
             continue;
         }
         server_ctx.server_ntor = client_ctx.server_ntor;
+
+        memcpy(server_ctx.identity, client_ctx.identity, sizeof(client_ctx.identity));
+        memcpy(server_ctx.timing_seed, client_ctx.timing_seed, sizeof(client_ctx.timing_seed));
 
         if (!EVP_PKEY_get_raw_private_key(client_ctx.server_ntor, client_ctx.server_priv, &(size_t){COBFS4_PRIVKEY_LEN})) {
             ++bad;

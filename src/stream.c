@@ -156,6 +156,10 @@ static int write_server_response(int fd, const struct server_response *resp) {
     memcpy(buf + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + COBFS4_INLINE_SEED_FRAME_LEN + resp->padding_len + COBFS4_HMAC_LEN,
             resp->response_mac, COBFS4_HMAC_LEN);
 
+    printf("Server response\n");
+    dump_hex(buf,
+            COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + COBFS4_INLINE_SEED_FRAME_LEN + resp->padding_len + COBFS4_HMAC_LEN);
+
     ret = blocking_write(fd, buf,
             COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + COBFS4_INLINE_SEED_FRAME_LEN + resp->padding_len + COBFS4_HMAC_LEN);
     if (ret < 0) {
@@ -181,19 +185,23 @@ static int read_server_response(int fd, const struct shared_data * restrict shar
     printf("Client side shared data\n");
     dump_hex(shared_buf, sizeof(shared_buf));
 
-    ret = hmac_gen(shared_buf, sizeof(shared_buf), buf, COBFS4_ELLIGATOR_LEN, marker);
-    if (ret < 0) {
-        goto error;
-    }
-
-    printf("Marker:\n");
-    dump_hex(marker, sizeof(marker));
-
     ret = blocking_read(fd, buf, COBFS4_SERVER_HANDSHAKE_LEN);
     if (ret <= 0) {
         goto error;
     }
     bytes_read += COBFS4_SERVER_HANDSHAKE_LEN;
+
+    ret = hmac_gen(shared_buf, sizeof(shared_buf), buf, COBFS4_ELLIGATOR_LEN, marker);
+    if (ret < 0) {
+        goto error;
+    }
+
+    printf("Dumping marker 4\n");
+    dump_hex(marker, sizeof(marker));
+    printf("Dumping marker 5\n");
+    dump_hex(buf, COBFS4_ELLIGATOR_LEN);
+    printf("Dumping marker 6\n");
+    dump_hex(shared_buf, sizeof(shared_buf));
 
 retry:
     ret = nonblocking_read(fd, buf + bytes_read, COBFS4_MAX_HANDSHAKE_SIZE - bytes_read);
@@ -230,13 +238,13 @@ done:
 
     marker_index = (marker_location - buf);
     //We somehow didn't read the full trailing HMAC for the packet
-    if ((bytes_read - marker_index) < COBFS4_HMAC_LEN) {
+    if ((bytes_read - marker_index + COBFS4_HMAC_LEN) < COBFS4_HMAC_LEN) {
         ret = blocking_read(fd, buf + bytes_read, COBFS4_HMAC_LEN - (bytes_read - marker_index));
         if (ret <= 0) {
             goto error;
         }
         bytes_read += ret;
-    } else if ((bytes_read - marker_index) > COBFS4_HMAC_LEN) {
+    } else if ((bytes_read - marker_index + COBFS4_HMAC_LEN) > COBFS4_HMAC_LEN) {
         //We read more data than expected
         //TODO: Abstract this whole thing out for client/server and check if we're the server
         //the client should never send trailing garbage to the server, since it doesn't have the keys yet
@@ -247,7 +255,7 @@ done:
     memcpy(out_resp->auth_tag, buf + COBFS4_ELLIGATOR_LEN, COBFS4_AUTH_LEN);
     memcpy(out_resp->seed_frame, buf + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN, COBFS4_INLINE_SEED_FRAME_LEN);
 
-    out_resp->padding_len = (marker - buf + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + COBFS4_INLINE_SEED_FRAME_LEN);
+    out_resp->padding_len = (marker_index - COBFS4_ELLIGATOR_LEN - COBFS4_AUTH_LEN - COBFS4_INLINE_SEED_FRAME_LEN);
     memcpy(out_resp->random_padding,
             buf + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + COBFS4_INLINE_SEED_FRAME_LEN,
             out_resp->padding_len);
@@ -340,18 +348,26 @@ static int read_client_request(int fd, const struct shared_data * restrict share
     printf("Server side shared data\n");
     dump_hex(shared_buf, sizeof(shared_buf));
 
-    ret = hmac_gen(shared_buf, sizeof(shared_buf), buf, COBFS4_ELLIGATOR_LEN, marker);
-    if (ret < 0) {
-        fprintf(stderr, "%s : %d\n", __func__, __LINE__);
-        goto error;
-    }
-
     ret = blocking_read(fd, buf, COBFS4_CLIENT_HANDSHAKE_LEN);
     if (ret <= 0) {
         fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     }
     bytes_read += COBFS4_CLIENT_HANDSHAKE_LEN;
+
+    ret = hmac_gen(shared_buf, sizeof(shared_buf), buf, COBFS4_ELLIGATOR_LEN, marker);
+    if (ret < 0) {
+        fprintf(stderr, "%s : %d\n", __func__, __LINE__);
+        goto error;
+    }
+
+    printf("Dumping marker 1\n");
+    dump_hex(marker, sizeof(marker));
+    printf("Dumping marker 2\n");
+    dump_hex(buf, COBFS4_ELLIGATOR_LEN);
+    printf("Dumping marker 3\n");
+    dump_hex(shared_buf, sizeof(shared_buf));
+
 
 retry:
     ret = nonblocking_read(fd, buf + bytes_read, COBFS4_MAX_HANDSHAKE_SIZE - bytes_read);
@@ -375,8 +391,6 @@ retry:
 done:
     printf("Dumping buffer\n");
     dump_hex(buf, bytes_read);
-    printf("Dumping input\n");
-    dump_hex(marker, sizeof(marker));
     marker_location = cobfs4_memmem(buf, bytes_read, marker, sizeof(marker));
     if (marker_location == NULL) {
         if (bytes_read == COBFS4_MAX_HANDSHAKE_SIZE) {
@@ -395,23 +409,26 @@ done:
 
     marker_index = (marker_location - buf);
     //We somehow didn't read the full trailing HMAC for the packet
-    if ((bytes_read - marker_index) < COBFS4_HMAC_LEN) {
+    if ((bytes_read - marker_index - COBFS4_HMAC_LEN) < COBFS4_HMAC_LEN) {
         ret = blocking_read(fd, buf + bytes_read, COBFS4_HMAC_LEN - (bytes_read - marker_index));
         if (ret <= 0) {
             fprintf(stderr, "%s : %d\n", __func__, __LINE__);
             goto error;
         }
         bytes_read += ret;
-    } else if ((bytes_read - marker_index) > COBFS4_HMAC_LEN) {
+    } else if ((bytes_read - marker_index - COBFS4_HMAC_LEN) > COBFS4_HMAC_LEN) {
         //We read more data than expected
         //TODO: Abstract this whole thing out for client/server and check if we're the server
         //the client should never send trailing garbage to the server, since it doesn't have the keys yet
+        printf("How much extra did we read? %d %d %d\n", (bytes_read - marker_index), bytes_read, marker_index);
+        printf("Dumping full total buffer\n");
+        dump_hex(buf, bytes_read);
         fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     }
 
     memcpy(out_req->elligator, buf, COBFS4_ELLIGATOR_LEN);
-    out_req->padding_len = (marker - buf + COBFS4_ELLIGATOR_LEN);
+    out_req->padding_len = marker_index - COBFS4_ELLIGATOR_LEN;
     memcpy(out_req->random_padding, buf + COBFS4_ELLIGATOR_LEN, out_req->padding_len);
     memcpy(out_req->elligator_hmac, marker, COBFS4_HMAC_LEN);
     memcpy(out_req->request_mac, marker + COBFS4_HMAC_LEN, COBFS4_HMAC_LEN);
