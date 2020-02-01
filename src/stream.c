@@ -17,6 +17,11 @@
 #include "utils.h"
 #include "hmac.h"
 
+static const struct timeval timeout = {
+    .tv_sec = 1,
+    .tv_usec = 0,
+};
+
 static int blocking_read(int sock, unsigned char * restrict buf, size_t buf_len) {
     ssize_t ret;
 
@@ -24,9 +29,10 @@ retry:
     ret = recv(sock, buf, buf_len, 0);
     if (ret == -1) {
         switch(errno) {
-            case EAGAIN:
             case EINTR:
                 goto retry;
+            //We use blocking sockets so EAGAIN is timeout which means die
+            case EAGAIN:
             case EBADF:
             case ECONNREFUSED:
             case EFAULT:
@@ -82,9 +88,10 @@ retry:
     ret = send(sock, buf, buf_len, MSG_NOSIGNAL);
     if (ret == -1) {
         switch(errno) {
-            case EAGAIN:
             case EINTR:
                 goto retry;
+            //We use blocking sockets so EAGAIN is timeout which means die
+            case EAGAIN:
             case EACCES:
             case EALREADY:
             case EBADF:
@@ -461,6 +468,14 @@ int cobfs4_client_init(struct cobfs4_stream * restrict stream, int socket,
     stream->fd = socket;
     stream->type = COBFS4_CLIENT;
 
+    if (setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
+        goto error;
+    }
+
+    if (setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
+        goto error;
+    }
+
     server_ntor = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519, NULL, server_pubkey, COBFS4_PUBKEY_LEN);
     if (server_ntor == NULL) {
         goto error;
@@ -499,6 +514,14 @@ int cobfs4_server_init(struct cobfs4_stream * restrict stream, int socket,
     memset(stream, 0, sizeof(*stream));
     stream->fd = socket;
     stream->type = COBFS4_SERVER;
+
+    if (setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
+        goto error;
+    }
+
+    if (setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
+        goto error;
+    }
 
     server_ntor = EVP_PKEY_new_raw_private_key(EVP_PKEY_X25519, NULL, private_key, COBFS4_PRIVKEY_LEN);
     if (server_ntor == NULL) {
