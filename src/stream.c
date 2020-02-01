@@ -34,11 +34,9 @@ retry:
             case ENOMEM:
             case ENOTCONN:
             case ENOTSOCK:
-                //fprintf(stderr, "Returning %d %s : %d\n", ret, __func__, __LINE__);
                 return -1;
         }
     } else if (ret == 0) {
-        //fprintf(stderr, "Returning %d %s : %d\n", ret, __func__, __LINE__);
         return -1;
     }
 
@@ -48,7 +46,6 @@ retry:
         goto retry;
     }
 
-    //fprintf(stderr, "Returning %d %s : %d\n", ret, __func__, __LINE__);
     return ret;
 }
 
@@ -70,14 +67,11 @@ retry:
             case ENOMEM:
             case ENOTCONN:
             case ENOTSOCK:
-                //fprintf(stderr, "Returning %d %s : %d\n", ret, __func__, __LINE__);
                 return -1;
         }
     } else if (ret == 0) {
-        //fprintf(stderr, "Returning %d %s : %d\n", ret, __func__, __LINE__);
         return -1;
     }
-    //fprintf(stderr, "Returning %d %s : %d\n", ret, __func__, __LINE__);
     return ret;
 }
 
@@ -124,19 +118,21 @@ retry:
 static int write_client_request(int fd, const struct client_request *req) {
     unsigned char buf[COBFS4_MAX_HANDSHAKE_SIZE];
     int ret;
+    size_t client_request_len = 0;
 
     memcpy(buf, req->elligator, COBFS4_ELLIGATOR_LEN);
     memcpy(buf + COBFS4_ELLIGATOR_LEN, req->random_padding, req->padding_len);
     memcpy(buf + COBFS4_ELLIGATOR_LEN + req->padding_len, req->elligator_hmac, COBFS4_HMAC_LEN);
     memcpy(buf + COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN, req->request_mac, COBFS4_HMAC_LEN);
 
-    printf("Dumping: 1\n");
-    dump_hex(req->elligator_hmac, sizeof(req->elligator_hmac));
-    printf("Dumping: 2\n");
-    dump_hex(buf, COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN + COBFS4_HMAC_LEN);
+    client_request_len = (COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN + COBFS4_HMAC_LEN);
+    //Server expects a minimum of COBFS4_CLIENT_HANDSHAKE_LEN
+    if (client_request_len - req->padding_len != COBFS4_CLIENT_HANDSHAKE_LEN) {
+        return -1;
+    }
+
     ret = blocking_write(fd, buf, COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN + COBFS4_HMAC_LEN);
     if (ret < 0) {
-        //fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         return -1;
     }
     return 0;
@@ -145,6 +141,7 @@ static int write_client_request(int fd, const struct client_request *req) {
 static int write_server_response(int fd, const struct server_response *resp) {
     unsigned char buf[COBFS4_MAX_HANDSHAKE_SIZE];
     int ret;
+    size_t server_response_len = 0;
 
     memcpy(buf, resp->elligator, COBFS4_ELLIGATOR_LEN);
     memcpy(buf + COBFS4_ELLIGATOR_LEN, resp->auth_tag, COBFS4_AUTH_LEN);
@@ -156,12 +153,15 @@ static int write_server_response(int fd, const struct server_response *resp) {
     memcpy(buf + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + COBFS4_INLINE_SEED_FRAME_LEN + resp->padding_len + COBFS4_HMAC_LEN,
             resp->response_mac, COBFS4_HMAC_LEN);
 
-    printf("Server response\n");
-    dump_hex(buf,
-            COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + COBFS4_INLINE_SEED_FRAME_LEN + resp->padding_len + COBFS4_HMAC_LEN);
+    server_response_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN
+        + COBFS4_INLINE_SEED_FRAME_LEN + resp->padding_len + COBFS4_HMAC_LEN + COBFS4_HMAC_LEN;
 
-    ret = blocking_write(fd, buf,
-            COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + COBFS4_INLINE_SEED_FRAME_LEN + resp->padding_len + COBFS4_HMAC_LEN);
+    //Client expects COBFS4_SERVER_HANDSHAKE_LEN as a minimum
+    if (server_response_len - resp->padding_len != COBFS4_SERVER_HANDSHAKE_LEN) {
+        return -1;
+    }
+
+    ret = blocking_write(fd, buf, server_response_len);
     if (ret < 0) {
         return -1;
     }
@@ -182,8 +182,6 @@ static int read_server_response(int fd, const struct shared_data * restrict shar
     if (!make_shared_data(shared, shared_buf)) {
         goto error;
     }
-    printf("Client side shared data\n");
-    dump_hex(shared_buf, sizeof(shared_buf));
 
     ret = blocking_read(fd, buf, COBFS4_SERVER_HANDSHAKE_LEN);
     if (ret <= 0) {
@@ -191,17 +189,11 @@ static int read_server_response(int fd, const struct shared_data * restrict shar
     }
     bytes_read += COBFS4_SERVER_HANDSHAKE_LEN;
 
+
     ret = hmac_gen(shared_buf, sizeof(shared_buf), buf, COBFS4_ELLIGATOR_LEN, marker);
     if (ret < 0) {
         goto error;
     }
-
-    printf("Dumping marker 4\n");
-    dump_hex(marker, sizeof(marker));
-    printf("Dumping marker 5\n");
-    dump_hex(buf, COBFS4_ELLIGATOR_LEN);
-    printf("Dumping marker 6\n");
-    dump_hex(shared_buf, sizeof(shared_buf));
 
 retry:
     ret = nonblocking_read(fd, buf + bytes_read, COBFS4_MAX_HANDSHAKE_SIZE - bytes_read);
@@ -244,7 +236,7 @@ done:
             goto error;
         }
         bytes_read += ret;
-    } else if ((bytes_read - marker_index + COBFS4_HMAC_LEN) > COBFS4_HMAC_LEN) {
+    } else if ((bytes_read - (marker_index + COBFS4_HMAC_LEN)) > COBFS4_HMAC_LEN) {
         //We read more data than expected
         //TODO: Abstract this whole thing out for client/server and check if we're the server
         //the client should never send trailing garbage to the server, since it doesn't have the keys yet
@@ -260,8 +252,8 @@ done:
             buf + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + COBFS4_INLINE_SEED_FRAME_LEN,
             out_resp->padding_len);
 
-    memcpy(out_resp->elligator_hmac, marker, COBFS4_HMAC_LEN);
-    memcpy(out_resp->response_mac, marker + COBFS4_HMAC_LEN, COBFS4_HMAC_LEN);
+    memcpy(out_resp->elligator_hmac, marker_location, COBFS4_HMAC_LEN);
+    memcpy(out_resp->response_mac, marker_location + COBFS4_HMAC_LEN, COBFS4_HMAC_LEN);
 
     return 0;
 
@@ -281,27 +273,22 @@ static int perform_client_handshake(struct cobfs4_stream *stream) {
 
     ephem = ecdh_key_alloc();
     if (ephem == NULL) {
-        //fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     }
 
     if (create_client_request(ephem, &stream->shared, &request)) {
-        //fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     }
 
     if (write_client_request(stream->fd, &request)) {
-        //fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     }
 
     if (read_server_response(stream->fd, &stream->shared, &response)) {
-        //fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     }
 
     if (client_process_server_response(ephem, &stream->shared, &response, timing_seed, &keys)) {
-        //fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     }
 
@@ -341,38 +328,27 @@ static int read_client_request(int fd, const struct shared_data * restrict share
     memset(buf, 0, sizeof(buf));
 
     if (!make_shared_data(shared, shared_buf)) {
-        fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     }
 
-    printf("Server side shared data\n");
-    dump_hex(shared_buf, sizeof(shared_buf));
 
     ret = blocking_read(fd, buf, COBFS4_CLIENT_HANDSHAKE_LEN);
     if (ret <= 0) {
-        fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     }
     bytes_read += COBFS4_CLIENT_HANDSHAKE_LEN;
 
+
     ret = hmac_gen(shared_buf, sizeof(shared_buf), buf, COBFS4_ELLIGATOR_LEN, marker);
     if (ret < 0) {
-        fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     }
 
-    printf("Dumping marker 1\n");
-    dump_hex(marker, sizeof(marker));
-    printf("Dumping marker 2\n");
-    dump_hex(buf, COBFS4_ELLIGATOR_LEN);
-    printf("Dumping marker 3\n");
-    dump_hex(shared_buf, sizeof(shared_buf));
 
 
 retry:
     ret = nonblocking_read(fd, buf + bytes_read, COBFS4_MAX_HANDSHAKE_SIZE - bytes_read);
     if (ret < 0) {
-        fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     } else if (ret == 0) {
         //We hit EAGAIN
@@ -389,18 +365,14 @@ retry:
     }
 
 done:
-    printf("Dumping buffer\n");
-    dump_hex(buf, bytes_read);
     marker_location = cobfs4_memmem(buf, bytes_read, marker, sizeof(marker));
     if (marker_location == NULL) {
         if (bytes_read == COBFS4_MAX_HANDSHAKE_SIZE) {
             //This is not a valid handshake
-            fprintf(stderr, "%s : %d\n", __func__, __LINE__);
             goto error;
         }
         if (bytes_read == old_bytes_read) {
             //We hit EAGAIN on our last retry without reading anything new
-            fprintf(stderr, "%s : %d\n", __func__, __LINE__);
             goto error;
         }
         old_bytes_read = bytes_read;
@@ -412,7 +384,6 @@ done:
     if ((bytes_read - marker_index - COBFS4_HMAC_LEN) < COBFS4_HMAC_LEN) {
         ret = blocking_read(fd, buf + bytes_read, COBFS4_HMAC_LEN - (bytes_read - marker_index));
         if (ret <= 0) {
-            fprintf(stderr, "%s : %d\n", __func__, __LINE__);
             goto error;
         }
         bytes_read += ret;
@@ -420,18 +391,14 @@ done:
         //We read more data than expected
         //TODO: Abstract this whole thing out for client/server and check if we're the server
         //the client should never send trailing garbage to the server, since it doesn't have the keys yet
-        printf("How much extra did we read? %d %d %d\n", (bytes_read - marker_index), bytes_read, marker_index);
-        printf("Dumping full total buffer\n");
-        dump_hex(buf, bytes_read);
-        fprintf(stderr, "%s : %d\n", __func__, __LINE__);
         goto error;
     }
 
     memcpy(out_req->elligator, buf, COBFS4_ELLIGATOR_LEN);
     out_req->padding_len = marker_index - COBFS4_ELLIGATOR_LEN;
     memcpy(out_req->random_padding, buf + COBFS4_ELLIGATOR_LEN, out_req->padding_len);
-    memcpy(out_req->elligator_hmac, marker, COBFS4_HMAC_LEN);
-    memcpy(out_req->request_mac, marker + COBFS4_HMAC_LEN, COBFS4_HMAC_LEN);
+    memcpy(out_req->elligator_hmac, marker_location, COBFS4_HMAC_LEN);
+    memcpy(out_req->request_mac, marker_location + COBFS4_HMAC_LEN, COBFS4_HMAC_LEN);
 
     return 0;
 
@@ -464,6 +431,14 @@ static int perform_server_handshake(struct cobfs4_stream *stream) {
     if (write_server_response(stream->fd, &response)) {
         goto error;
     }
+
+    memcpy(stream->read_key, keys.client2server_key, COBFS4_SECRET_KEY_LEN);
+    memcpy(stream->read_nonce_prefix, keys.client2server_nonce_prefix, COBFS4_NONCE_PREFIX_LEN);
+    memcpy(stream->write_key, keys.server2client_key, COBFS4_SECRET_KEY_LEN);
+    memcpy(stream->write_nonce_prefix, keys.server2client_nonce_prefix, COBFS4_NONCE_PREFIX_LEN);
+
+    siphash_init(&stream->read_siphash, keys.client2server_siphash_key, keys.client2server_siphash_iv);
+    siphash_init(&stream->write_siphash, keys.server2client_siphash_key, keys.server2client_siphash_iv);
 
     EVP_PKEY_free(ephem);
     OPENSSL_cleanse(&keys, sizeof(keys));

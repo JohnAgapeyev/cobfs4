@@ -13,6 +13,7 @@
 #include "stream.h"
 #include "constants.h"
 #include "ecdh.h"
+#include "utils.h"
 
 struct stream_test_ctx {
     uint8_t server_priv[COBFS4_PRIVKEY_LEN];
@@ -25,11 +26,13 @@ struct stream_test_ctx {
 };
 
 static sem_t sem;
+static int server_socket;
+static int listen_socket;
+static int client_socket;
 
 void *client_thread_routine(void *ctx) {
     struct stream_test_ctx *test = ctx;
-    int client_socket = socket(AF_INET, SOCK_STREAM, 0);
-    int ret;
+    client_socket = socket(AF_INET, SOCK_STREAM, 0);
     void * func_ret;
 
     struct sockaddr_in servaddr;
@@ -41,38 +44,25 @@ void *client_thread_routine(void *ctx) {
 
     sem_wait(&sem);
 
-    ret = connect(client_socket, (struct sockaddr *)&servaddr, sizeof(servaddr));
-    //printf("1 %d %d\n", ret, errno);
+    connect(client_socket, (struct sockaddr *)&servaddr, sizeof(servaddr));
 
     sem_post(&sem);
 
 
-#if 1
-    if (cobfs4_client_init(test->stream, client_socket, test->server_pub, test->identity, sizeof(test->identity)) <= 0) {
-        printf("Badness\n");
-        close(client_socket);
+    if (cobfs4_client_init(test->stream, client_socket,
+                test->server_pub, test->identity,
+                sizeof(test->identity))) {
         return (void *)-1;
     }
-#else
-    uint8_t buf[64];
-    ret = send(client_socket, "foobar\0", 7, 0);
-    printf("2 %d\n", ret);
-    ret = recv(client_socket, buf, 64, 0);
-    printf("3 %d\n", ret);
-    printf("%s\n", buf);
-#endif
 
     func_ret = (void *) test->test_case(test->stream);
-
-    close(client_socket);
 
     return func_ret;
 }
 
 void *server_thread_routine(void *ctx) {
     struct stream_test_ctx *test = ctx;
-    int listen_socket = socket(AF_INET, SOCK_STREAM, 0);
-    int ret;
+    listen_socket = socket(AF_INET, SOCK_STREAM, 0);
     void * func_ret;
 
     struct sockaddr_in servaddr;
@@ -82,36 +72,20 @@ void *server_thread_routine(void *ctx) {
 
     setsockopt(listen_socket, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
 
-    ret = bind(listen_socket, (struct sockaddr *)&servaddr, sizeof(servaddr));
-    //printf("4 %d\n", ret);
-    ret = listen(listen_socket, 5);
-    //printf("5 %d\n", ret);
+    bind(listen_socket, (struct sockaddr *)&servaddr, sizeof(servaddr));
+    listen(listen_socket, 5);
 
     sem_post(&sem);
 
-    int server_socket = accept(listen_socket, NULL, NULL);
-    //printf("8 %d\n", server_socket);
+    server_socket = accept(listen_socket, NULL, NULL);
 
-#if 1
-    if (cobfs4_server_init(test->stream, server_socket, test->server_priv, test->identity, sizeof(test->identity), test->timing_seed) <= 0) {
-        printf("Server Badness\n");
-        close(server_socket);
-        close(listen_socket);
+    if (cobfs4_server_init(test->stream, server_socket,
+                test->server_priv, test->identity,
+                sizeof(test->identity), test->timing_seed)) {
         return (void *) -1;
     }
-#else
-    uint8_t buf[64];
-    ret = recv(server_socket, buf, 64, 0);
-    printf("6 %d\n", ret);
-    ret = send(server_socket, "fizzbuzz\0", 9, 0);
-    printf("7 %d\n", ret);
-    printf("%s\n", buf);
-#endif
 
     func_ret = (void *) test->test_case(test->stream);
-
-    close(server_socket);
-    close(listen_socket);
 
     return func_ret;
 }
@@ -126,8 +100,7 @@ void test_stream(void) {
     int bad = 0;
     int i;
 
-    //for (i = 0; i < 10000; ++i) {
-    for (i = 0; i < 1; ++i) {
+    for (i = 0; i < 10000; ++i) {
         struct stream_test_ctx client_ctx;
         struct stream_test_ctx server_ctx;
 
@@ -136,6 +109,9 @@ void test_stream(void) {
 
         struct cobfs4_stream client_stream;
         struct cobfs4_stream server_stream;
+
+        void *client_ret;
+        void *server_ret;
 
         RAND_bytes((unsigned char *) &client_ctx.identity, sizeof(client_ctx.identity));
         RAND_bytes((unsigned char *) &client_ctx.timing_seed, sizeof(client_ctx.timing_seed));
@@ -179,10 +155,23 @@ void test_stream(void) {
 
         pthread_create(&client_thread, NULL, client_thread_routine, &client_ctx);
 
-        pthread_join(client_thread, NULL);
-        pthread_join(server_thread, NULL);
+        pthread_join(client_thread, &client_ret);
+        pthread_join(server_thread, &server_ret);
+
+        close(client_socket);
+        close(server_socket);
+        close(listen_socket);
 
         sem_destroy(&sem);
+
+        if ((intptr_t)client_ret == -1) {
+            ++bad;
+            continue;
+        }
+        if ((intptr_t)server_ret == -1) {
+            ++bad;
+            continue;
+        }
 
         if (memcmp(client_stream.read_key, server_stream.write_key, sizeof(client_stream.read_key)) != 0) {
             ++bad;

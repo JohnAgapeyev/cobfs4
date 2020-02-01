@@ -2,7 +2,7 @@
 #include "test.h"
 
 int main(void) {
-#if 1
+#if 0
     test_elligator();
     test_hmac();
     test_ecdh();
