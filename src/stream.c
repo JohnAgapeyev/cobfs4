@@ -596,7 +596,7 @@ int cobfs4_read(struct cobfs4_stream * restrict stream, uint8_t buffer[static re
     frame_len ^= len_mask;
 
     //Frame length is too small
-    if (frame_len < COBFS4_FRAME_OVERHEAD) {
+    if (frame_len < COBFS4_FRAME_PAYLOAD_OVERHEAD) {
         goto error;
     }
 
@@ -676,7 +676,7 @@ int cobfs4_write(struct cobfs4_stream *restrict stream, uint8_t * restrict buffe
         padding_len = content_len - data_len;
 
         //Convert frame counter into big endian
-        tmp_frame_counter = swap_uint64(stream->read_frame_counter);
+        tmp_frame_counter = swap_uint64(stream->write_frame_counter);
 
         memcpy(iv, stream->write_nonce_prefix, COBFS4_NONCE_PREFIX_LEN);
         memcpy(iv + COBFS4_NONCE_PREFIX_LEN, &tmp_frame_counter, sizeof(tmp_frame_counter));
