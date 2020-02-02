@@ -16,6 +16,7 @@
 #include "ecdh.h"
 #include "utils.h"
 #include "hmac.h"
+#include "frame.h"
 
 static const struct timeval timeout = {
     .tv_sec = 1,
@@ -196,7 +197,6 @@ static int read_server_response(int fd, const struct shared_data * restrict shar
     }
     bytes_read += COBFS4_SERVER_HANDSHAKE_LEN;
 
-
     ret = hmac_gen(shared_buf, sizeof(shared_buf), buf, COBFS4_ELLIGATOR_LEN, marker);
     if (ret < 0) {
         goto error;
@@ -307,6 +307,8 @@ static int perform_client_handshake(struct cobfs4_stream *stream) {
     siphash_init(&stream->read_siphash, keys.server2client_siphash_key, keys.server2client_siphash_iv);
     siphash_init(&stream->write_siphash, keys.client2server_siphash_key, keys.client2server_siphash_iv);
 
+    seed_random(&stream->rng, timing_seed);
+
     EVP_PKEY_free(ephem);
     OPENSSL_cleanse(timing_seed, sizeof(timing_seed));
     OPENSSL_cleanse(&keys, sizeof(keys));
@@ -338,7 +340,6 @@ static int read_client_request(int fd, const struct shared_data * restrict share
         goto error;
     }
 
-
     ret = blocking_read(fd, buf, COBFS4_CLIENT_HANDSHAKE_LEN);
     if (ret <= 0) {
         goto error;
@@ -350,8 +351,6 @@ static int read_client_request(int fd, const struct shared_data * restrict share
     if (ret < 0) {
         goto error;
     }
-
-
 
 retry:
     ret = nonblocking_read(fd, buf + bytes_read, COBFS4_MAX_HANDSHAKE_SIZE - bytes_read);
@@ -446,6 +445,8 @@ static int perform_server_handshake(struct cobfs4_stream *stream) {
 
     siphash_init(&stream->read_siphash, keys.client2server_siphash_key, keys.client2server_siphash_iv);
     siphash_init(&stream->write_siphash, keys.server2client_siphash_key, keys.server2client_siphash_iv);
+
+    seed_random(&stream->rng, stream->timing_seed);
 
     EVP_PKEY_free(ephem);
     OPENSSL_cleanse(&keys, sizeof(keys));
@@ -555,16 +556,157 @@ error:
 }
 
 int cobfs4_read(struct cobfs4_stream * restrict stream, uint8_t buffer[static restrict COBFS4_MAX_DATA_LEN]) {
+    int ret = 0;
+    uint16_t len_mask = 0;
+    uint16_t frame_len = 0;
+    uint16_t plaintext_len = 0;
+    enum frame_type type;
+    uint8_t iv[COBFS4_IV_LEN];
+    uint64_t tmp_frame_counter;
+
     if (!stream->initialized) {
-        return -1;
+        goto error;
     }
-    return 0;
+
+    ret = nonblocking_read(stream->fd, stream->read_buffer, sizeof(uint16_t));
+    if (ret == -1) {
+        goto error;
+    } else if (ret == 0) {
+        //EAGAIN, tell the caller to wait until read event
+        return 0;
+    } else if (ret == 1) {
+        //We somehow read 1 byte from a 2 byte read, so block until we get the other byte
+        if (blocking_read(stream->fd, stream->read_buffer + 1, 1) != 1) {
+            goto error;
+        }
+    }
+
+    if (stream->read_frame_counter == UINT64_MAX) {
+        //Counter would wrap post increment
+        goto error;
+    }
+    ++stream->read_frame_counter;
+
+    if (siphash(&stream->read_siphash, &len_mask)) {
+        goto error;
+    }
+
+    memcpy(&frame_len, stream->read_buffer, sizeof(frame_len));
+
+    frame_len ^= len_mask;
+
+    //Frame length is too small
+    if (frame_len < COBFS4_FRAME_OVERHEAD) {
+        goto error;
+    }
+
+    //Frame length is too big
+    if ((frame_len - COBFS4_FRAME_LEN) > COBFS4_MAX_FRAME_LEN) {
+        goto error;
+    }
+
+    //The packets are <1500 bytes so we can safely block for them
+    if (blocking_read(stream->fd, stream->read_buffer + COBFS4_FRAME_LEN, frame_len) != frame_len) {
+        goto error;
+    }
+
+    //Convert frame counter into big endian
+    tmp_frame_counter = swap_uint64(stream->read_frame_counter);
+
+    memcpy(iv, stream->read_nonce_prefix, COBFS4_NONCE_PREFIX_LEN);
+    memcpy(iv + COBFS4_NONCE_PREFIX_LEN, &tmp_frame_counter, sizeof(tmp_frame_counter));
+
+    if (decrypt_frame(stream->read_buffer + COBFS4_FRAME_LEN, frame_len, stream->read_key, iv, buffer, &plaintext_len, &type)) {
+        goto error;
+    }
+
+    switch(type) {
+        case TYPE_PAYLOAD:
+            break;
+        case TYPE_PRNG_SEED:
+            if (plaintext_len != COBFS4_SERVER_TIMING_SEED_LEN) {
+                //We got a seed with an unexpected length
+                goto error;
+            }
+            seed_random(&stream->rng, buffer);
+            goto control_packet;
+        default:
+            //Unknown type
+            goto control_packet;
+    }
+
+    return plaintext_len;
+
+control_packet:
+    OPENSSL_cleanse(buffer, COBFS4_MAX_DATA_LEN);
+    return cobfs4_read(stream, buffer);
+
+error:
+    //This should close the socket after delay
+    OPENSSL_cleanse(buffer, COBFS4_MAX_DATA_LEN);
+    return -1;
 }
 
 int cobfs4_write(struct cobfs4_stream *restrict stream, uint8_t * restrict buffer, size_t buf_len) {
+    uint16_t frame_len;
+    uint16_t len_mask;
+    uint16_t desired_len;
+    uint16_t content_len;
+    uint16_t data_len;
+    uint16_t padding_len;
+    uint64_t tmp_frame_counter;
+    uint8_t iv[COBFS4_IV_LEN];
+
     if (!stream->initialized) {
-        return -1;
+        goto error;
     }
+
+    do {
+        if (stream->write_frame_counter == UINT64_MAX) {
+            //Counter would wrap post increment
+            goto error;
+        }
+        ++stream->write_frame_counter;
+
+        //This cast should be safe due to the bounds on the random
+        desired_len = (uint16_t) deterministic_rand_interval(&stream->rng, COBFS4_FRAME_OVERHEAD, COBFS4_MAX_FRAME_LEN);
+        content_len = desired_len - COBFS4_FRAME_OVERHEAD;
+
+        data_len = (content_len <= buf_len) ? content_len : buf_len;
+        padding_len = content_len - data_len;
+
+        //Convert frame counter into big endian
+        tmp_frame_counter = swap_uint64(stream->read_frame_counter);
+
+        memcpy(iv, stream->write_nonce_prefix, COBFS4_NONCE_PREFIX_LEN);
+        memcpy(iv + COBFS4_NONCE_PREFIX_LEN, &tmp_frame_counter, sizeof(tmp_frame_counter));
+
+        if (make_frame(buffer, data_len, padding_len, TYPE_PAYLOAD,
+                    stream->write_key, iv, stream->write_buffer + COBFS4_FRAME_LEN)) {
+            goto error;
+        }
+
+        if (siphash(&stream->write_siphash, &len_mask)) {
+            goto error;
+        }
+
+        frame_len = content_len + COBFS4_FRAME_PAYLOAD_OVERHEAD;
+        frame_len ^= len_mask;
+
+        memcpy(stream->write_buffer, &frame_len, COBFS4_FRAME_LEN);
+
+        if (blocking_write(stream->fd, stream->write_buffer, content_len + COBFS4_FRAME_OVERHEAD) < 0) {
+            goto error;
+        }
+
+        buffer += data_len;
+        buf_len -= data_len;
+    } while (buf_len > 0);
+
     return 0;
+
+error:
+    //This should close the socket after delay
+    return -1;
 }
 

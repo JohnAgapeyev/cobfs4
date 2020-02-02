@@ -33,6 +33,9 @@ struct cobfs4_stream {
     uint8_t write_key[COBFS4_SECRET_KEY_LEN];
     uint8_t write_nonce_prefix[COBFS4_NONCE_PREFIX_LEN];
 
+    uint64_t read_frame_counter;
+    uint64_t write_frame_counter;
+
     bool initialized;
 };
 
