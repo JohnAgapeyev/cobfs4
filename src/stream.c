@@ -2,11 +2,13 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include <openssl/evp.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <unistd.h>
 #include <errno.h>
+
+#include <openssl/evp.h>
 
 #include "stream.h"
 #include "constants.h"
@@ -121,6 +123,27 @@ retry:
     }
 
     return 0;
+}
+
+/*
+ * Randomly sleeps between 0 and 10ms in increments of 100us
+ */
+static inline void random_wait(struct rng_state *rng) {
+    const uint64_t choice = deterministic_rand_interval(rng, 0, 100);
+    const struct timespec delay = {
+        .tv_sec = 0,
+        .tv_nsec = 1000 * 100 * choice,
+    };
+    struct timespec remainder = {0};
+    const struct timespec *time = &delay;
+    int ret;
+
+retry:
+    ret = nanosleep(time, &remainder);
+    if (ret == -1 && errno == EINTR) {
+        time = &remainder;
+        goto retry;
+    }
 }
 
 static int write_client_request(int fd, const struct client_request *req) {
@@ -463,8 +486,6 @@ error:
 int cobfs4_client_init(struct cobfs4_stream * restrict stream, int socket,
         const uint8_t server_pubkey[static restrict COBFS4_PUBKEY_LEN],
         uint8_t * restrict identity_data, size_t identity_len) {
-    EVP_PKEY *server_ntor = NULL;
-
     memset(stream, 0, sizeof(*stream));
     stream->fd = socket;
     stream->type = COBFS4_CLIENT;
@@ -477,16 +498,14 @@ int cobfs4_client_init(struct cobfs4_stream * restrict stream, int socket,
         goto error;
     }
 
-    server_ntor = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519, NULL, server_pubkey, COBFS4_PUBKEY_LEN);
-    if (server_ntor == NULL) {
+    stream->shared.ntor = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519, NULL, server_pubkey, COBFS4_PUBKEY_LEN);
+    if (stream->shared.ntor == NULL) {
         goto error;
     }
 
-    if (!elligator_valid(server_ntor)) {
+    if (!elligator_valid(stream->shared.ntor)) {
         goto error;
     }
-
-    stream->shared.ntor = server_ntor;
 
     if (hash_data(identity_data, identity_len, stream->shared.identity_digest)) {
         goto error;
@@ -500,9 +519,7 @@ int cobfs4_client_init(struct cobfs4_stream * restrict stream, int socket,
     return 0;
 
 error:
-    if (server_ntor) {
-        EVP_PKEY_free(server_ntor);
-    }
+    cobfs4_cleanup(stream);
     return -1;
 }
 
@@ -510,8 +527,6 @@ int cobfs4_server_init(struct cobfs4_stream * restrict stream, int socket,
         const uint8_t private_key[static restrict COBFS4_PRIVKEY_LEN],
         uint8_t * restrict identity_data, size_t identity_len,
         const uint8_t timing_seed[static restrict COBFS4_SERVER_TIMING_SEED_LEN]) {
-    EVP_PKEY *server_ntor = NULL;
-
     memset(stream, 0, sizeof(*stream));
     stream->fd = socket;
     stream->type = COBFS4_SERVER;
@@ -524,16 +539,14 @@ int cobfs4_server_init(struct cobfs4_stream * restrict stream, int socket,
         goto error;
     }
 
-    server_ntor = EVP_PKEY_new_raw_private_key(EVP_PKEY_X25519, NULL, private_key, COBFS4_PRIVKEY_LEN);
-    if (server_ntor == NULL) {
+    stream->shared.ntor = EVP_PKEY_new_raw_private_key(EVP_PKEY_X25519, NULL, private_key, COBFS4_PRIVKEY_LEN);
+    if (stream->shared.ntor == NULL) {
         goto error;
     }
 
-    if (!elligator_valid(server_ntor)) {
+    if (!elligator_valid(stream->shared.ntor)) {
         goto error;
     }
-
-    stream->shared.ntor = server_ntor;
 
     if (hash_data(identity_data, identity_len, stream->shared.identity_digest)) {
         goto error;
@@ -549,10 +562,20 @@ int cobfs4_server_init(struct cobfs4_stream * restrict stream, int socket,
     return 0;
 
 error:
-    if (server_ntor) {
-        EVP_PKEY_free(server_ntor);
-    }
+    cobfs4_cleanup(stream);
     return -1;
+}
+
+void cobfs4_cleanup(struct cobfs4_stream *stream) {
+    if (stream->shared.ntor) {
+        EVP_PKEY_free(stream->shared.ntor);
+    }
+
+    random_wait(&stream->rng);
+    shutdown(stream->fd, SHUT_RDWR);
+    close(stream->fd);
+
+    OPENSSL_cleanse(stream, sizeof(*stream));
 }
 
 int cobfs4_read(struct cobfs4_stream * restrict stream, uint8_t buffer[static restrict COBFS4_MAX_DATA_LEN]) {
@@ -642,8 +665,8 @@ control_packet:
     return cobfs4_read(stream, buffer);
 
 error:
-    //This should close the socket after delay
     OPENSSL_cleanse(buffer, COBFS4_MAX_DATA_LEN);
+    cobfs4_cleanup(stream);
     return -1;
 }
 
@@ -695,6 +718,8 @@ int cobfs4_write(struct cobfs4_stream *restrict stream, uint8_t * restrict buffe
 
         memcpy(stream->write_buffer, &frame_len, COBFS4_FRAME_LEN);
 
+        random_wait(&stream->rng);
+
         if (blocking_write(stream->fd, stream->write_buffer, content_len + COBFS4_FRAME_OVERHEAD) < 0) {
             goto error;
         }
@@ -706,7 +731,6 @@ int cobfs4_write(struct cobfs4_stream *restrict stream, uint8_t * restrict buffe
     return 0;
 
 error:
-    //This should close the socket after delay
+    cobfs4_cleanup(stream);
     return -1;
 }
-

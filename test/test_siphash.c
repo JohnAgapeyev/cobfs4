@@ -12,7 +12,7 @@ void test_siphash(void) {
     int good = 0;
     int bad = 0;
     int i;
-    for (i = 0; i < 10000; ++i) {
+    for (i = 0; i < TEST_CASE_COUNT; ++i) {
         uint8_t key[COBFS4_SIPHASH_KEY_LEN];
         uint8_t iv[COBFS4_SIPHASH_IV_LEN];
 

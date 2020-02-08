@@ -1,6 +1,8 @@
 #ifndef COBFS4_TEST_HEADER
 #define COBFS4_TEST_HEADER
 
+#define TEST_CASE_COUNT 1000
+
 void test_elligator(void);
 void test_hmac(void);
 void test_ecdh(void);

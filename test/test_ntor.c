@@ -14,7 +14,7 @@ void test_ntor(void) {
     int good = 0;
     int bad = 0;
     int i = 0;
-    for (i = 0; i < 10000; ++i) {
+    for (i = 0; i < TEST_CASE_COUNT; ++i) {
         EVP_PKEY *X = ecdh_key_alloc();
         EVP_PKEY *Y = ecdh_key_alloc();
 

@@ -98,9 +98,10 @@ void *server_thread_routine(void *ctx) {
 static void wait_for_data(int fd) {
     struct epoll_event ev;
     struct epoll_event event;
-    int epollfd;
+    int epollfd = epoll_create1(0);
 
-    epollfd = epoll_create1(0);
+    memset(&ev, 0, sizeof(ev));
+    memset(&event, 0, sizeof(event));
 
     ev.events = EPOLLIN;
     ev.data.fd = fd;
@@ -167,7 +168,7 @@ void test_stream(void) {
     int bad = 0;
     int i;
 
-    for (i = 0; i < 10000; ++i) {
+    for (i = 0; i < TEST_CASE_COUNT; ++i) {
         struct stream_test_ctx client_ctx;
         struct stream_test_ctx server_ctx;
 
@@ -186,6 +187,9 @@ void test_stream(void) {
         client_ctx.server_ntor = ecdh_key_alloc();
         if (client_ctx.server_ntor == NULL) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         server_ctx.server_ntor = client_ctx.server_ntor;
@@ -195,18 +199,30 @@ void test_stream(void) {
 
         if (!EVP_PKEY_get_raw_private_key(client_ctx.server_ntor, client_ctx.server_priv, &(size_t){COBFS4_PRIVKEY_LEN})) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         if (!EVP_PKEY_get_raw_public_key(client_ctx.server_ntor, client_ctx.server_pub, &(size_t){COBFS4_PUBKEY_LEN})) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         if (!EVP_PKEY_get_raw_private_key(server_ctx.server_ntor, server_ctx.server_priv, &(size_t){COBFS4_PRIVKEY_LEN})) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         if (!EVP_PKEY_get_raw_public_key(server_ctx.server_ntor, server_ctx.server_pub, &(size_t){COBFS4_PUBKEY_LEN})) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
 
@@ -225,50 +241,78 @@ void test_stream(void) {
         pthread_join(client_thread, &client_ret);
         pthread_join(server_thread, &server_ret);
 
-        close(client_socket);
-        close(server_socket);
         close(listen_socket);
 
         sem_destroy(&sem);
 
         if ((intptr_t)client_ret == -1) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         if ((intptr_t)server_ret == -1) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
 
         if (memcmp(client_stream.read_key, server_stream.write_key, sizeof(client_stream.read_key)) != 0) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         if (memcmp(server_stream.read_key, client_stream.write_key, sizeof(server_stream.read_key)) != 0) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         if (memcmp(client_stream.read_nonce_prefix, server_stream.write_nonce_prefix, sizeof(client_stream.read_nonce_prefix)) != 0) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         if (memcmp(server_stream.read_nonce_prefix, client_stream.write_nonce_prefix, sizeof(server_stream.read_nonce_prefix)) != 0) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         if (memcmp(&client_stream.read_siphash, &server_stream.write_siphash, sizeof(client_stream.read_siphash)) != 0) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         if (memcmp(&server_stream.read_siphash, &client_stream.write_siphash, sizeof(server_stream.read_siphash)) != 0) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         if (memcmp(&client_stream.rng, &server_stream.rng, sizeof(client_stream.rng)) != 0) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         ++good;
+        EVP_PKEY_free(client_ctx.server_ntor);
+        cobfs4_cleanup(&client_stream);
+        cobfs4_cleanup(&server_stream);
     }
 
     printf("Stream handshake testing ran %d times\nResults:\nGood: %d\nBad: %d\n", i, good, bad);
@@ -276,7 +320,7 @@ void test_stream(void) {
     good = 0;
     bad = 0;
 
-    for (i = 0; i < 10000; ++i) {
+    for (i = 0; i < TEST_CASE_COUNT; ++i) {
         struct stream_test_ctx client_ctx;
         struct stream_test_ctx server_ctx;
 
@@ -295,6 +339,9 @@ void test_stream(void) {
         client_ctx.server_ntor = ecdh_key_alloc();
         if (client_ctx.server_ntor == NULL) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         server_ctx.server_ntor = client_ctx.server_ntor;
@@ -304,18 +351,30 @@ void test_stream(void) {
 
         if (!EVP_PKEY_get_raw_private_key(client_ctx.server_ntor, client_ctx.server_priv, &(size_t){COBFS4_PRIVKEY_LEN})) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         if (!EVP_PKEY_get_raw_public_key(client_ctx.server_ntor, client_ctx.server_pub, &(size_t){COBFS4_PUBKEY_LEN})) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         if (!EVP_PKEY_get_raw_private_key(server_ctx.server_ntor, server_ctx.server_priv, &(size_t){COBFS4_PRIVKEY_LEN})) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         if (!EVP_PKEY_get_raw_public_key(server_ctx.server_ntor, server_ctx.server_pub, &(size_t){COBFS4_PUBKEY_LEN})) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
 
@@ -334,49 +393,78 @@ void test_stream(void) {
         pthread_join(client_thread, &client_ret);
         pthread_join(server_thread, &server_ret);
 
-        close(client_socket);
-        close(server_socket);
         close(listen_socket);
 
         sem_destroy(&sem);
 
         if ((intptr_t)client_ret == -1) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         if ((intptr_t)server_ret == -1) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
 
         if (memcmp(client_stream.read_key, server_stream.write_key, sizeof(client_stream.read_key)) != 0) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         if (memcmp(server_stream.read_key, client_stream.write_key, sizeof(server_stream.read_key)) != 0) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         if (memcmp(client_stream.read_nonce_prefix, server_stream.write_nonce_prefix, sizeof(client_stream.read_nonce_prefix)) != 0) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         if (memcmp(server_stream.read_nonce_prefix, client_stream.write_nonce_prefix, sizeof(server_stream.read_nonce_prefix)) != 0) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         if (memcmp(&client_stream.read_siphash, &server_stream.write_siphash, sizeof(client_stream.read_siphash)) != 0) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         if (memcmp(&server_stream.read_siphash, &client_stream.write_siphash, sizeof(server_stream.read_siphash)) != 0) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
         if (memcmp(&client_stream.rng, &server_stream.rng, sizeof(client_stream.rng)) != 0) {
             ++bad;
+            EVP_PKEY_free(client_ctx.server_ntor);
+            cobfs4_cleanup(&client_stream);
+            cobfs4_cleanup(&server_stream);
             continue;
         }
+        EVP_PKEY_free(client_ctx.server_ntor);
+        cobfs4_cleanup(&client_stream);
+        cobfs4_cleanup(&server_stream);
+
         ++good;
     }
 

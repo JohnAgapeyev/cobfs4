@@ -12,7 +12,7 @@ void test_ecdh(void) {
     int good = 0;
     int bad = 0;
     int i;
-    for (i = 0; i < 10000; ++i) {
+    for (i = 0; i < TEST_CASE_COUNT; ++i) {
         uint8_t client_shared[COBFS4_PUBKEY_LEN];
         uint8_t server_shared[COBFS4_PUBKEY_LEN];
 

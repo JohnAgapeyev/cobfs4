@@ -51,4 +51,6 @@ int cobfs4_client_init(struct cobfs4_stream * restrict stream, int socket,
 int cobfs4_read(struct cobfs4_stream * restrict stream, uint8_t buffer[static restrict COBFS4_MAX_DATA_LEN]);
 int cobfs4_write(struct cobfs4_stream * restrict stream, uint8_t * restrict buffer, size_t buf_len);
 
+void cobfs4_cleanup(struct cobfs4_stream *stream);
+
 #endif /* COBFS4_STREAM */

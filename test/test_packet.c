@@ -16,7 +16,7 @@ void test_handshake(void) {
     int good = 0;
     int bad = 0;
     int i = 0;
-    for (i = 0; i < 10000; ++i) {
+    for (i = 0; i < TEST_CASE_COUNT; ++i) {
         EVP_PKEY *client_key = ecdh_key_alloc();
 
         uint8_t server_seed[COBFS4_SERVER_TIMING_SEED_LEN];

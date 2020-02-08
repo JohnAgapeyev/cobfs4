@@ -37,7 +37,7 @@ void test_elligator(void) {
 
     EVP_PKEY_keygen_init(pctx);
 
-    for (count = 0; count < 10000; ++count) {
+    for (count = 0; count < TEST_CASE_COUNT; ++count) {
         EVP_PKEY_keygen(pctx, &pkey);
 
         EVP_PKEY_get_raw_public_key(pkey, NULL, &skeylen);
@@ -45,45 +45,22 @@ void test_elligator(void) {
         skey = OPENSSL_malloc(skeylen);
         skey2 = OPENSSL_malloc(skeylen);
 
-        if (!EVP_PKEY_get_raw_public_key(pkey, skey, &skeylen)) {
-            /*
-            printf("Get raw call failed\n");
-            printf("%s\n", ERR_error_string(ERR_get_error(), NULL));
-            */
-        }
+        EVP_PKEY_get_raw_public_key(pkey, skey, &skeylen);
 
         skey3 = elligator2(pkey, elligator);
 
         if (skey3 == 0) {
             peerkey = elligator2_inv(elligator);
             if (peerkey) {
-                if (!EVP_PKEY_get_raw_public_key(peerkey, skey2, &skeylen)) {
-                    /*
-                    printf("Get raw call failed\n");
-                    printf("%s\n", ERR_error_string(ERR_get_error(), NULL));
-                    */
-                }
-                /*
-                for (i = 0; i < 32; ++i) {
-                    printf("%02x", skey[i]);
-                }
-                printf("\n");
-                for (i = 0; i < 32; ++i) {
-                    printf("%02x", skey2[i]);
-                }
-                printf("\n");
-                */
+                EVP_PKEY_get_raw_public_key(peerkey, skey2, &skeylen);
                 if (memcmp(skey, skey2, 32) == 0) {
-                    /* printf("Elligator works as intended\n"); */
                     ++good;
                 } else {
-                    /* printf("Elligator FAILED\n"); */
                     ++bad;
                 }
                 EVP_PKEY_free(peerkey);
             }
         } else {
-            /* printf("Generated key was not valid for elligator2\n"); */
             ++invalid;
         }
 

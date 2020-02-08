@@ -11,7 +11,7 @@ void test_seeded_random(void) {
     int good = 0;
     int bad = 0;
     int i;
-    for (i = 0; i < 10000; ++i) {
+    for (i = 0; i < TEST_CASE_COUNT; ++i) {
         uint8_t seed[COBFS4_SECRET_KEY_LEN];
 
         uint8_t out1[1024];

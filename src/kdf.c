@@ -13,7 +13,6 @@ int hkdf(const uint8_t * restrict mesg,
         size_t out_len) {
 
     EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, NULL);
-
     if (pctx == NULL) {
         return -1;
     }
@@ -35,6 +34,8 @@ int hkdf(const uint8_t * restrict mesg,
     if (EVP_PKEY_derive(pctx, out_data, &out_len) <= 0) {
         goto error;
     }
+
+    EVP_PKEY_CTX_free(pctx);
     return 0;
 
 error:

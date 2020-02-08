@@ -11,7 +11,7 @@ void test_aead(void) {
     int good = 0;
     int bad = 0;
     int i;
-    for (i = 0; i < 10000; ++i) {
+    for (i = 0; i < TEST_CASE_COUNT; ++i) {
         uint8_t key[COBFS4_SECRET_KEY_LEN];
         uint8_t iv[COBFS4_IV_LEN];
         uint8_t aad[32];
@@ -52,7 +52,7 @@ void test_frame(void) {
     int bad = 0;
     int i;
 
-    for (i = 0; i < 10000; ++i) {
+    for (i = 0; i < TEST_CASE_COUNT; ++i) {
         uint8_t key[COBFS4_SECRET_KEY_LEN];
         uint8_t iv[COBFS4_IV_LEN];
         uint8_t message[COBFS4_MAX_DATA_LEN - 10];
@@ -91,7 +91,7 @@ void test_frame(void) {
 
     good = 0;
     bad = 0;
-    for (i = 0; i < 10000; ++i) {
+    for (i = 0; i < TEST_CASE_COUNT; ++i) {
         uint8_t key[COBFS4_SECRET_KEY_LEN];
         uint8_t iv[COBFS4_IV_LEN];
         uint8_t message[COBFS4_MAX_DATA_LEN - 10];
@@ -130,7 +130,7 @@ void test_frame(void) {
 
     good = 0;
     bad = 0;
-    for (i = 0; i < 10000; ++i) {
+    for (i = 0; i < TEST_CASE_COUNT; ++i) {
         uint8_t key[COBFS4_SECRET_KEY_LEN];
         uint8_t iv[COBFS4_IV_LEN];
         uint8_t message[COBFS4_MAX_DATA_LEN];
@@ -169,7 +169,7 @@ void test_frame(void) {
 
     good = 0;
     bad = 0;
-    for (i = 0; i < 10000; ++i) {
+    for (i = 0; i < TEST_CASE_COUNT; ++i) {
         uint8_t key[COBFS4_SECRET_KEY_LEN];
         uint8_t iv[COBFS4_IV_LEN];
         uint8_t message[20];

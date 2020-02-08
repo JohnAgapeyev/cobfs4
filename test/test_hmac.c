@@ -19,7 +19,7 @@ void test_hmac(void) {
     int bad = 0;
     int i;
 
-    for (i = 0; i < 10000; ++i) {
+    for (i = 0; i < TEST_CASE_COUNT; ++i) {
         RAND_bytes(&key_len, 1);
         RAND_bytes(&mesg_len, 1);
 
