@@ -3,6 +3,7 @@
 
 #include <openssl/rand.h>
 #include <openssl/evp.h>
+#include <limits.h>
 
 #include "random.h"
 
@@ -39,12 +40,16 @@ static inline uint64_t deterministic_rand_interval(struct rng_state *state,
     const uint64_t range = 1 + max - min;
     const uint64_t buckets = UINT64_MAX / range;
     const uint64_t limit = buckets * range;
+    int ret;
 
     /* Create equal size buckets all in a row, then fire randomly towards
      * the buckets until you land in one of them. All buckets are equally
      * likely. If you land off the end of the line of buckets, try again. */
     do {
-        deterministic_random(state, (uint8_t *) &r, sizeof(r));
+        ret = deterministic_random(state, (uint8_t *) &r, sizeof(r));
+        if (ret == -1) {
+            return UINT64_MAX;
+        }
     } while (r >= limit);
 
     return min + (r / buckets);

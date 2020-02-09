@@ -627,6 +627,7 @@ error:
 int cobfs4_write(struct cobfs4_stream *restrict stream, uint8_t * restrict buffer, size_t buf_len) {
     uint16_t frame_len;
     uint16_t len_mask;
+    uint64_t rand_output;
     uint16_t desired_len;
     uint16_t content_len;
     uint16_t data_len;
@@ -646,7 +647,11 @@ int cobfs4_write(struct cobfs4_stream *restrict stream, uint8_t * restrict buffe
         ++stream->write_frame_counter;
 
         //This cast should be safe due to the bounds on the random
-        desired_len = (uint16_t) deterministic_rand_interval(&stream->rng, COBFS4_FRAME_OVERHEAD, COBFS4_MAX_FRAME_LEN);
+        rand_output = deterministic_rand_interval(&stream->rng, COBFS4_FRAME_OVERHEAD, COBFS4_MAX_FRAME_LEN);
+        if (rand_output < COBFS4_FRAME_OVERHEAD || rand_output > COBFS4_MAX_FRAME_LEN) {
+            goto error;
+        }
+        desired_len = (uint16_t) rand_output;
         content_len = desired_len - COBFS4_FRAME_OVERHEAD;
 
         data_len = (content_len <= buf_len) ? content_len : buf_len;
