@@ -146,6 +146,95 @@ retry:
     }
 }
 
+static int read_handshake_packet(const struct cobfs4_stream * restrict stream,
+        uint8_t buf[static restrict COBFS4_MAX_HANDSHAKE_SIZE],
+        uint8_t ** restrict out_marker_location) {
+    uint8_t shared_buf[COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN];
+    uint8_t marker[COBFS4_HMAC_LEN];
+    size_t bytes_read = 0;
+    size_t old_bytes_read = 0;
+    int ret;
+    size_t marker_index;
+    const size_t min_packet_len = (stream->type == COBFS4_CLIENT) ? COBFS4_CLIENT_HANDSHAKE_LEN : COBFS4_SERVER_HANDSHAKE_LEN;
+
+    if (!make_shared_data(&stream->shared, shared_buf)) {
+        goto error;
+    }
+
+    ret = blocking_read(stream->fd, buf, min_packet_len);
+    if (ret <= 0) {
+        goto error;
+    }
+    bytes_read += min_packet_len;
+
+    ret = hmac_gen(shared_buf, sizeof(shared_buf), buf, COBFS4_ELLIGATOR_LEN, marker);
+    if (ret < 0) {
+        goto error;
+    }
+
+retry:
+    ret = nonblocking_read(stream->fd, buf + bytes_read, COBFS4_MAX_HANDSHAKE_SIZE - bytes_read);
+    if (ret < 0) {
+        goto error;
+    } else if (ret == 0) {
+        //We hit EAGAIN
+        //Try to find the MAC with what we have
+        goto done;
+    } else {
+        //We got some data
+        bytes_read += ret;
+        if (bytes_read >= COBFS4_MAX_HANDSHAKE_SIZE) {
+            bytes_read = COBFS4_MAX_HANDSHAKE_SIZE;
+            goto done;
+        }
+        goto retry;
+    }
+
+done:
+    *out_marker_location = cobfs4_memmem(buf, bytes_read, marker, sizeof(marker));
+    if (*out_marker_location == NULL) {
+        if (bytes_read == COBFS4_MAX_HANDSHAKE_SIZE) {
+            //This is not a valid handshake
+            goto error;
+        }
+        if (bytes_read == old_bytes_read) {
+            //We hit EAGAIN on our last retry without reading anything new
+            goto error;
+        }
+        old_bytes_read = bytes_read;
+        goto retry;
+    }
+
+    marker_index = (*out_marker_location - buf);
+    //We somehow didn't read the full trailing HMAC for the packet
+    if ((bytes_read - marker_index + COBFS4_HMAC_LEN) < COBFS4_HMAC_LEN) {
+        ret = blocking_read(stream->fd, buf + bytes_read, COBFS4_HMAC_LEN - (bytes_read - marker_index));
+        if (ret <= 0) {
+            goto error;
+        }
+        bytes_read += ret;
+    } else if ((bytes_read - (marker_index + COBFS4_HMAC_LEN)) > COBFS4_HMAC_LEN) {
+        //We read more data than expected
+        if (stream->type == COBFS4_SERVER) {
+            goto error;
+        } else {
+            //The server sent us the first packet
+            //TODO: Do we need to handle this?
+        }
+        goto error;
+    }
+
+    OPENSSL_cleanse(shared_buf, sizeof(shared_buf));
+    OPENSSL_cleanse(marker, sizeof(marker));
+
+    return 0;
+
+error:
+    OPENSSL_cleanse(shared_buf, sizeof(shared_buf));
+    OPENSSL_cleanse(marker, sizeof(marker));
+    return -1;
+}
+
 static int write_client_request(int fd, const struct client_request *req) {
     unsigned char buf[COBFS4_MAX_HANDSHAKE_SIZE];
     int ret;
@@ -199,79 +288,19 @@ static int write_server_response(int fd, const struct server_response *resp) {
     return 0;
 }
 
-static int read_server_response(int fd, const struct shared_data * restrict shared,
+static int read_server_response(const struct cobfs4_stream * restrict stream,
         struct server_response *out_resp) {
     uint8_t buf[COBFS4_MAX_HANDSHAKE_SIZE];
-    uint8_t shared_buf[COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN];
-    uint8_t marker[COBFS4_HMAC_LEN];
-    size_t bytes_read = 0;
-    size_t old_bytes_read = 0;
-    int ret;
     uint8_t *marker_location;
     size_t marker_index;
 
-    if (!make_shared_data(shared, shared_buf)) {
-        goto error;
-    }
+    memset(buf, 0, sizeof(buf));
 
-    ret = blocking_read(fd, buf, COBFS4_SERVER_HANDSHAKE_LEN);
-    if (ret <= 0) {
+    if (read_handshake_packet(stream, buf, &marker_location) == -1) {
         goto error;
-    }
-    bytes_read += COBFS4_SERVER_HANDSHAKE_LEN;
-
-    ret = hmac_gen(shared_buf, sizeof(shared_buf), buf, COBFS4_ELLIGATOR_LEN, marker);
-    if (ret < 0) {
-        goto error;
-    }
-
-retry:
-    ret = nonblocking_read(fd, buf + bytes_read, COBFS4_MAX_HANDSHAKE_SIZE - bytes_read);
-    if (ret < 0) {
-        goto error;
-    } else if (ret == 0) {
-        //We hit EAGAIN
-        //Try to find the MAC with what we have
-        goto done;
-    } else {
-        //We got some data
-        bytes_read += ret;
-        if (bytes_read >= COBFS4_MAX_HANDSHAKE_SIZE) {
-            bytes_read = COBFS4_MAX_HANDSHAKE_SIZE;
-            goto done;
-        }
-        goto retry;
-    }
-
-done:
-    marker_location = cobfs4_memmem(buf, bytes_read, marker, sizeof(marker));
-    if (marker_location == NULL) {
-        if (bytes_read == COBFS4_MAX_HANDSHAKE_SIZE) {
-            //This is not a valid handshake
-            goto error;
-        }
-        if (bytes_read == old_bytes_read) {
-            //We hit EAGAIN on our last retry without reading anything new
-            goto error;
-        }
-        old_bytes_read = bytes_read;
-        goto retry;
     }
 
     marker_index = (marker_location - buf);
-    //We somehow didn't read the full trailing HMAC for the packet
-    if ((bytes_read - marker_index + COBFS4_HMAC_LEN) < COBFS4_HMAC_LEN) {
-        ret = blocking_read(fd, buf + bytes_read, COBFS4_HMAC_LEN - (bytes_read - marker_index));
-        if (ret <= 0) {
-            goto error;
-        }
-        bytes_read += ret;
-    } else if ((bytes_read - (marker_index + COBFS4_HMAC_LEN)) > COBFS4_HMAC_LEN) {
-        //We read more data than expected
-        //TODO: Abstract this whole thing out for client/server and check if we're the server
-        //the client should never send trailing garbage to the server, since it doesn't have the keys yet
-        goto error;
-    }
 
     memcpy(out_resp->elligator, buf, COBFS4_ELLIGATOR_LEN);
     memcpy(out_resp->auth_tag, buf + COBFS4_ELLIGATOR_LEN, COBFS4_AUTH_LEN);
@@ -285,12 +314,11 @@ done:
     memcpy(out_resp->elligator_hmac, marker_location, COBFS4_HMAC_LEN);
     memcpy(out_resp->response_mac, marker_location + COBFS4_HMAC_LEN, COBFS4_HMAC_LEN);
 
+    OPENSSL_cleanse(buf, sizeof(buf));
     return 0;
 
 error:
     OPENSSL_cleanse(buf, sizeof(buf));
-    OPENSSL_cleanse(shared_buf, sizeof(shared_buf));
-    OPENSSL_cleanse(marker, sizeof(marker));
     return -1;
 }
 
@@ -314,7 +342,7 @@ static int perform_client_handshake(struct cobfs4_stream *stream) {
         goto error;
     }
 
-    if (read_server_response(stream->fd, &stream->shared, &response)) {
+    if (read_server_response(stream, &response)) {
         goto error;
     }
 
@@ -346,82 +374,19 @@ error:
     return -1;
 }
 
-static int read_client_request(int fd, const struct shared_data * restrict shared,
+static int read_client_request(const struct cobfs4_stream * restrict stream,
         struct client_request *out_req) {
     uint8_t buf[COBFS4_MAX_HANDSHAKE_SIZE];
-    uint8_t shared_buf[COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN];
-    uint8_t marker[COBFS4_HMAC_LEN];
-    size_t bytes_read = 0;
-    size_t old_bytes_read = 0;
-    int ret;
     uint8_t *marker_location;
     size_t marker_index;
 
     memset(buf, 0, sizeof(buf));
 
-    if (!make_shared_data(shared, shared_buf)) {
+    if (read_handshake_packet(stream, buf, &marker_location) == -1) {
         goto error;
-    }
-
-    ret = blocking_read(fd, buf, COBFS4_CLIENT_HANDSHAKE_LEN);
-    if (ret <= 0) {
-        goto error;
-    }
-    bytes_read += COBFS4_CLIENT_HANDSHAKE_LEN;
-
-
-    ret = hmac_gen(shared_buf, sizeof(shared_buf), buf, COBFS4_ELLIGATOR_LEN, marker);
-    if (ret < 0) {
-        goto error;
-    }
-
-retry:
-    ret = nonblocking_read(fd, buf + bytes_read, COBFS4_MAX_HANDSHAKE_SIZE - bytes_read);
-    if (ret < 0) {
-        goto error;
-    } else if (ret == 0) {
-        //We hit EAGAIN
-        //Try to find the MAC with what we have
-        goto done;
-    } else {
-        //We got some data
-        bytes_read += ret;
-        if (bytes_read >= COBFS4_MAX_HANDSHAKE_SIZE) {
-            bytes_read = COBFS4_MAX_HANDSHAKE_SIZE;
-            goto done;
-        }
-        goto retry;
-    }
-
-done:
-    marker_location = cobfs4_memmem(buf, bytes_read, marker, sizeof(marker));
-    if (marker_location == NULL) {
-        if (bytes_read == COBFS4_MAX_HANDSHAKE_SIZE) {
-            //This is not a valid handshake
-            goto error;
-        }
-        if (bytes_read == old_bytes_read) {
-            //We hit EAGAIN on our last retry without reading anything new
-            goto error;
-        }
-        old_bytes_read = bytes_read;
-        goto retry;
     }
 
     marker_index = (marker_location - buf);
-    //We somehow didn't read the full trailing HMAC for the packet
-    if ((bytes_read - marker_index - COBFS4_HMAC_LEN) < COBFS4_HMAC_LEN) {
-        ret = blocking_read(fd, buf + bytes_read, COBFS4_HMAC_LEN - (bytes_read - marker_index));
-        if (ret <= 0) {
-            goto error;
-        }
-        bytes_read += ret;
-    } else if ((bytes_read - marker_index - COBFS4_HMAC_LEN) > COBFS4_HMAC_LEN) {
-        //We read more data than expected
-        //TODO: Abstract this whole thing out for client/server and check if we're the server
-        //the client should never send trailing garbage to the server, since it doesn't have the keys yet
-        goto error;
-    }
 
     memcpy(out_req->elligator, buf, COBFS4_ELLIGATOR_LEN);
     out_req->padding_len = marker_index - COBFS4_ELLIGATOR_LEN;
@@ -429,12 +394,11 @@ done:
     memcpy(out_req->elligator_hmac, marker_location, COBFS4_HMAC_LEN);
     memcpy(out_req->request_mac, marker_location + COBFS4_HMAC_LEN, COBFS4_HMAC_LEN);
 
+    OPENSSL_cleanse(buf, sizeof(buf));
     return 0;
 
 error:
     OPENSSL_cleanse(buf, sizeof(buf));
-    OPENSSL_cleanse(shared_buf, sizeof(shared_buf));
-    OPENSSL_cleanse(marker, sizeof(marker));
     return -1;
 }
 
@@ -442,14 +406,8 @@ static int perform_server_handshake(struct cobfs4_stream *stream) {
     struct client_request request;
     struct server_response response;
     struct stretched_key keys;
-    EVP_PKEY *ephem = NULL;
 
-    ephem = ecdh_key_alloc();
-    if (ephem == NULL) {
-        goto error;
-    }
-
-    if (read_client_request(stream->fd, &stream->shared, &request)) {
+    if (read_client_request(stream, &request)) {
         goto error;
     }
 
@@ -471,14 +429,10 @@ static int perform_server_handshake(struct cobfs4_stream *stream) {
 
     seed_random(&stream->rng, stream->timing_seed);
 
-    EVP_PKEY_free(ephem);
     OPENSSL_cleanse(&keys, sizeof(keys));
     return 0;
 
 error:
-    if (ephem) {
-        EVP_PKEY_free(ephem);
-    }
     OPENSSL_cleanse(&keys, sizeof(keys));
     return -1;
 }
