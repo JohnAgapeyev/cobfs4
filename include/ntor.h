@@ -13,12 +13,12 @@ struct ntor_output {
     uint8_t key_seed[COBFS4_SEED_LEN];
 };
 
-int server_ntor(EVP_PKEY * restrict ephem_keypair,
+enum cobfs4_return_code server_ntor(EVP_PKEY * restrict ephem_keypair,
         EVP_PKEY * restrict remote_pubkey,
         const struct shared_data * restrict shared,
         struct ntor_output * restrict out);
 
-int client_ntor(EVP_PKEY * restrict ephem_keypair,
+enum cobfs4_return_code client_ntor(EVP_PKEY * restrict ephem_keypair,
         EVP_PKEY * restrict remote_pubkey,
         const struct shared_data * restrict shared,
         struct ntor_output * restrict out);

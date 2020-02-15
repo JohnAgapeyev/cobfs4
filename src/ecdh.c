@@ -52,7 +52,7 @@ retry:
     return pkey;
 }
 
-int ecdh_derive(EVP_PKEY * restrict self_keypair, EVP_PKEY * restrict remote_pub_key,
+enum cobfs4_return_code ecdh_derive(EVP_PKEY * restrict self_keypair, EVP_PKEY * restrict remote_pub_key,
         uint8_t out_buffer[static restrict COBFS4_PUBKEY_LEN]) {
     EVP_PKEY_CTX *ctx;
     uint8_t skey[COBFS4_PUBKEY_LEN];
@@ -60,7 +60,7 @@ int ecdh_derive(EVP_PKEY * restrict self_keypair, EVP_PKEY * restrict remote_pub
 
     ctx = EVP_PKEY_CTX_new(self_keypair, NULL);
     if (!ctx) {
-        return -1;
+        goto error;
     }
 
     if (EVP_PKEY_derive_init(ctx) <= 0) {
@@ -76,15 +76,17 @@ int ecdh_derive(EVP_PKEY * restrict self_keypair, EVP_PKEY * restrict remote_pub
         goto error;
     }
 
-    if (hash_data(skey, skeylen, out_buffer)) {
+    if (hash_data(skey, skeylen, out_buffer) != COBFS4_OK) {
         goto error;
     }
 
     EVP_PKEY_CTX_free(ctx);
-    return 0;
+    return COBFS4_OK;
 
 error:
     OPENSSL_cleanse(out_buffer, COBFS4_PUBKEY_LEN);
-    EVP_PKEY_CTX_free(ctx);
-    return -1;
+    if (ctx) {
+        EVP_PKEY_CTX_free(ctx);
+    }
+    return COBFS4_ERROR;
 }

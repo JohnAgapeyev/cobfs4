@@ -16,7 +16,6 @@ void test_elligator(void) {
     size_t skeylen;
     uint8_t *skey;
     uint8_t *skey2;
-    int skey3;
     int count;
     int good;
     int bad;
@@ -47,9 +46,7 @@ void test_elligator(void) {
 
         EVP_PKEY_get_raw_public_key(pkey, skey, &skeylen);
 
-        skey3 = elligator2(pkey, elligator);
-
-        if (skey3 == 0) {
+        if (elligator2(pkey, elligator) == COBFS4_OK) {
             peerkey = elligator2_inv(elligator);
             if (peerkey) {
                 EVP_PKEY_get_raw_public_key(peerkey, skey2, &skeylen);

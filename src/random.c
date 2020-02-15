@@ -10,7 +10,7 @@
 //Static variables explicitly get zeroed out on initialization
 static const uint8_t nonce[COBFS4_IV_LEN];
 
-int encrypt_chacha(const uint8_t * restrict plaintext, size_t plain_len,
+static enum cobfs4_return_code encrypt_chacha(const uint8_t * restrict plaintext, size_t plain_len,
         const uint8_t key[static restrict COBFS4_SECRET_KEY_LEN],
         const uint8_t iv[static restrict COBFS4_IV_LEN],
         uint8_t * restrict ciphertext) {
@@ -36,12 +36,13 @@ int encrypt_chacha(const uint8_t * restrict plaintext, size_t plain_len,
     ciphertextlen += len;
 
     EVP_CIPHER_CTX_free(ctx);
-
-    return ciphertextlen;
+    return COBFS4_OK;
 
 error:
-    EVP_CIPHER_CTX_free(ctx);
-    return -1;
+    if (ctx) {
+        EVP_CIPHER_CTX_free(ctx);
+    }
+    return COBFS4_ERROR;
 }
 
 void seed_random(struct rng_state * restrict state, const uint8_t seed[static restrict COBFS4_SECRET_KEY_LEN]) {
@@ -49,7 +50,7 @@ void seed_random(struct rng_state * restrict state, const uint8_t seed[static re
     state->seeded = 1;
 }
 
-int deterministic_random(struct rng_state *state, uint8_t *buf, size_t buf_len) {
+enum cobfs4_return_code deterministic_random(struct rng_state *state, uint8_t *buf, size_t buf_len) {
     static uint8_t input_buffer[RNG_OUTPUT_COUNT];
     uint8_t output_buffer[RNG_OUTPUT_COUNT];
 
@@ -64,7 +65,7 @@ int deterministic_random(struct rng_state *state, uint8_t *buf, size_t buf_len) 
     }
 
     while(buf_len != 0) {
-        if (encrypt_chacha(input_buffer, RNG_OUTPUT_COUNT, state->chacha_key, nonce, output_buffer) == -1) {
+        if (encrypt_chacha(input_buffer, RNG_OUTPUT_COUNT, state->chacha_key, nonce, output_buffer) != COBFS4_OK) {
             goto error;
         }
         memcpy(state->chacha_key, output_buffer, COBFS4_SECRET_KEY_LEN);
@@ -77,11 +78,10 @@ int deterministic_random(struct rng_state *state, uint8_t *buf, size_t buf_len) 
     }
 
     OPENSSL_cleanse(output_buffer, sizeof(output_buffer));
-
-    return 0;
+    return COBFS4_OK;
 
 error:
     OPENSSL_cleanse(&state, sizeof(state));
     OPENSSL_cleanse(output_buffer, sizeof(output_buffer));
-    return -1;
+    return COBFS4_ERROR;
 }

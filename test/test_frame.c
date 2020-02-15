@@ -19,7 +19,7 @@ void test_aead(void) {
         uint8_t ciphertext[10016];
         uint8_t tag[COBFS4_TAG_LEN];
         uint8_t plaintext[10000];
-        int cipher_len;
+        size_t cipher_len;
 
         RAND_bytes((unsigned char *) &key, sizeof(key));
         RAND_bytes((unsigned char *) &aad, sizeof(aad));
@@ -27,12 +27,12 @@ void test_aead(void) {
         //Yes I know the IV should be a counter, these tests are for correctness, not security
         RAND_bytes((unsigned char *) &iv, sizeof(iv));
 
-        if ((cipher_len = encrypt_aead(message, sizeof(message), aad, sizeof(aad), key, iv, ciphertext, tag)) < 0) {
+        if (encrypt_aead(message, sizeof(message), aad, sizeof(aad), key, iv, ciphertext, tag, &cipher_len) != COBFS4_OK) {
             ++bad;
             continue;
         }
 
-        if (decrypt_aead(ciphertext, cipher_len, aad, sizeof(aad), key, iv, tag, plaintext) < 0) {
+        if (decrypt_aead(ciphertext, cipher_len, aad, sizeof(aad), key, iv, tag, plaintext) != COBFS4_OK) {
             ++bad;
             continue;
         }
@@ -69,13 +69,13 @@ void test_frame(void) {
 
         type = TYPE_PAYLOAD;
 
-        if (make_frame(message, sizeof(message), 10, type, key, iv, ciphertext) < 0) {
+        if (make_frame(message, sizeof(message), 10, type, key, iv, ciphertext) != COBFS4_OK) {
             ++bad;
             continue;
         }
 
         if (decrypt_frame(ciphertext, sizeof(message) + 10 + COBFS4_FRAME_PAYLOAD_OVERHEAD,
-                    key, iv, plaintext, &frame_len, &recv_type) < 0) {
+                    key, iv, plaintext, &frame_len, &recv_type) != COBFS4_OK) {
             ++bad;
             continue;
         }
@@ -108,13 +108,13 @@ void test_frame(void) {
 
         type = TYPE_PAYLOAD;
 
-        if (make_frame(message, 0, 1100, type, key, iv, ciphertext) < 0) {
+        if (make_frame(message, 0, 1100, type, key, iv, ciphertext) != COBFS4_OK) {
             ++bad;
             continue;
         }
 
         if (decrypt_frame(ciphertext, 1100 + COBFS4_FRAME_PAYLOAD_OVERHEAD,
-                    key, iv, plaintext, &frame_len, &recv_type) < 0) {
+                    key, iv, plaintext, &frame_len, &recv_type) != COBFS4_OK) {
             ++bad;
             continue;
         }
@@ -147,13 +147,13 @@ void test_frame(void) {
 
         type = TYPE_PAYLOAD;
 
-        if (make_frame(message, sizeof(message), 0, type, key, iv, ciphertext) < 0) {
+        if (make_frame(message, sizeof(message), 0, type, key, iv, ciphertext) != COBFS4_OK) {
             ++bad;
             continue;
         }
 
         if (decrypt_frame(ciphertext, sizeof(message) + COBFS4_FRAME_PAYLOAD_OVERHEAD,
-                    key, iv, plaintext, &frame_len, &recv_type) < 0) {
+                    key, iv, plaintext, &frame_len, &recv_type) != COBFS4_OK) {
             ++bad;
             continue;
         }
@@ -186,13 +186,13 @@ void test_frame(void) {
 
         type = TYPE_PAYLOAD;
 
-        if (make_frame(message, sizeof(message), 0, type, key, iv, ciphertext) < 0) {
+        if (make_frame(message, sizeof(message), 0, type, key, iv, ciphertext) != COBFS4_OK) {
             ++bad;
             continue;
         }
 
         if (decrypt_frame(ciphertext, sizeof(message) + COBFS4_FRAME_PAYLOAD_OVERHEAD,
-                    key, iv, plaintext, &frame_len, &recv_type) < 0) {
+                    key, iv, plaintext, &frame_len, &recv_type) != COBFS4_OK) {
             ++bad;
             continue;
         }

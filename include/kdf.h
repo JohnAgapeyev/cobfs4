@@ -1,7 +1,9 @@
 #ifndef COBFS4_KDF
 #define COBFS4_KDF
 
-int hkdf(const uint8_t * restrict mesg,
+#include "constants.h"
+
+enum cobfs4_return_code hkdf(const uint8_t * restrict mesg,
         size_t mesg_len,
         const uint8_t * restrict salt,
         size_t salt_len,

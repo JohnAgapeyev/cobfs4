@@ -5,7 +5,7 @@
 #include "hash.h"
 #include "constants.h"
 
-int hash_data(uint8_t * restrict mesg, size_t mesg_len, uint8_t out_buf[static restrict COBFS4_HASH_LEN]) {
+enum cobfs4_return_code hash_data(uint8_t * restrict mesg, size_t mesg_len, uint8_t out_buf[static restrict COBFS4_HASH_LEN]) {
     EVP_MD_CTX *ctx = EVP_MD_CTX_new();
 
     if (!ctx) {
@@ -25,12 +25,12 @@ int hash_data(uint8_t * restrict mesg, size_t mesg_len, uint8_t out_buf[static r
     }
 
     EVP_MD_CTX_free(ctx);
-    return 0;
+    return COBFS4_OK;
 
 error:
     OPENSSL_cleanse(out_buf, COBFS4_HASH_LEN);
     if (ctx) {
         EVP_MD_CTX_free(ctx);
     }
-    return -1;
+    return COBFS4_ERROR;
 }

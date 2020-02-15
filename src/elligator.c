@@ -8,7 +8,7 @@
 
 static const char *X25519_PRIME = "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffed";
 
-int elligator2(const EVP_PKEY * restrict pkey, uint8_t out_elligator[static restrict COBFS4_ELLIGATOR_LEN]) {
+enum cobfs4_return_code elligator2(const EVP_PKEY * restrict pkey, uint8_t out_elligator[static restrict COBFS4_ELLIGATOR_LEN]) {
     BIGNUM *r;
     BIGNUM *x;
     BIGNUM *y;
@@ -321,7 +321,7 @@ int elligator2(const EVP_PKEY * restrict pkey, uint8_t out_elligator[static rest
     EVP_PKEY_CTX_free(pctx);
 
     memcpy(out_elligator, skey, 32);
-    return 0;
+    return COBFS4_OK;
 
 error:
     BN_CTX_free(bnctx);
@@ -343,7 +343,7 @@ free_x:
     BN_free(x);
 free_pkey_ctx:
     EVP_PKEY_CTX_free(pctx);
-    return -1;
+    return COBFS4_ERROR;
 }
 
 EVP_PKEY *elligator2_inv(const uint8_t buffer[static restrict COBFS4_ELLIGATOR_LEN]) {
@@ -669,7 +669,7 @@ bool elligator_valid(const EVP_PKEY * restrict pkey) {
     uint8_t elligator[COBFS4_ELLIGATOR_LEN];
     EVP_PKEY *res = NULL;
 
-    if (elligator2(pkey, elligator)) {
+    if (elligator2(pkey, elligator) != COBFS4_OK) {
         return false;
     }
 

@@ -29,14 +29,14 @@ void test_ecdh(void) {
             continue;
         }
 
-        if (ecdh_derive(first_key, second_key, client_shared)) {
+        if (ecdh_derive(first_key, second_key, client_shared) != COBFS4_OK) {
             ++bad;
             EVP_PKEY_free(first_key);
             EVP_PKEY_free(second_key);
             continue;
         }
 
-        if (ecdh_derive(second_key, first_key, server_shared)) {
+        if (ecdh_derive(second_key, first_key, server_shared) != COBFS4_OK) {
             ++bad;
             EVP_PKEY_free(first_key);
             EVP_PKEY_free(second_key);

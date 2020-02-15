@@ -10,7 +10,7 @@ void siphash_init(struct siphash_ctx * restrict ctx, const uint8_t key[static re
     memcpy(ctx->iv, iv, COBFS4_SIPHASH_IV_LEN);
 }
 
-int siphash(struct siphash_ctx * restrict ctx, uint16_t * restrict out_mask) {
+enum cobfs4_return_code siphash(struct siphash_ctx * restrict ctx, uint16_t * restrict out_mask) {
     const EVP_MD *md = EVP_sha512_256();
     uint8_t md_value[EVP_MAX_MD_SIZE];
     size_t md_len = 0;
@@ -44,7 +44,7 @@ int siphash(struct siphash_ctx * restrict ctx, uint16_t * restrict out_mask) {
 
     EVP_PKEY_free(pkey);
     EVP_MD_CTX_free(mdctx);
-    return 0;
+    return COBFS4_OK;
 
 error:
     if (pkey) {
@@ -54,5 +54,5 @@ error:
         EVP_MD_CTX_free(mdctx);
     }
     OPENSSL_cleanse(out_mask, sizeof(uint16_t));
-    return -1;
+    return COBFS4_ERROR;
 }

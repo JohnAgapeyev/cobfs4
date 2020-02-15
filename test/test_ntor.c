@@ -25,7 +25,7 @@ void test_ntor(void) {
         struct ntor_output client;
         struct ntor_output server;
 
-        if (server_ntor(Y, X, &shared, &server)) {
+        if (server_ntor(Y, X, &shared, &server) != COBFS4_OK) {
             ++bad;
             EVP_PKEY_free(shared.ntor);
             EVP_PKEY_free(X);
@@ -33,7 +33,7 @@ void test_ntor(void) {
             continue;
         }
 
-        if (client_ntor(X, Y, &shared, &client)) {
+        if (client_ntor(X, Y, &shared, &client) != COBFS4_OK) {
             ++bad;
             EVP_PKEY_free(shared.ntor);
             EVP_PKEY_free(X);

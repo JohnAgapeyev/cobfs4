@@ -2,8 +2,9 @@
 #include <openssl/kdf.h>
 
 #include "kdf.h"
+#include "constants.h"
 
-int hkdf(const uint8_t * restrict mesg,
+enum cobfs4_return_code hkdf(const uint8_t * restrict mesg,
         size_t mesg_len,
         const uint8_t * restrict salt,
         size_t salt_len,
@@ -11,10 +12,22 @@ int hkdf(const uint8_t * restrict mesg,
         size_t key_len,
         uint8_t * restrict out_data,
         size_t out_len) {
+    if (mesg == NULL) {
+        goto error;
+    }
+    if (salt == NULL) {
+        goto error;
+    }
+    if (key == NULL) {
+        goto error;
+    }
+    if (out_data == NULL) {
+        goto error;
+    }
 
     EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, NULL);
     if (pctx == NULL) {
-        return -1;
+        goto error;
     }
     if (EVP_PKEY_derive_init(pctx) <= 0) {
         goto error;
@@ -34,12 +47,13 @@ int hkdf(const uint8_t * restrict mesg,
     if (EVP_PKEY_derive(pctx, out_data, &out_len) <= 0) {
         goto error;
     }
-
     EVP_PKEY_CTX_free(pctx);
-    return 0;
+    return COBFS4_OK;
 
 error:
-    EVP_PKEY_CTX_free(pctx);
+    if (pctx) {
+        EVP_PKEY_CTX_free(pctx);
+    }
     OPENSSL_cleanse(out_data, out_len);
-    return -1;
+    return COBFS4_ERROR;
 }

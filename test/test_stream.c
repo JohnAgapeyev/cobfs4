@@ -54,7 +54,7 @@ void *client_thread_routine(void *ctx) {
 
     if (cobfs4_client_init(test->stream, client_socket,
                 test->server_pub, test->identity,
-                sizeof(test->identity))) {
+                sizeof(test->identity)) != COBFS4_OK) {
         return (void *)-1;
     }
 
@@ -86,7 +86,7 @@ void *server_thread_routine(void *ctx) {
 
     if (cobfs4_server_init(test->stream, server_socket,
                 test->server_priv, test->identity,
-                sizeof(test->identity), test->timing_seed)) {
+                sizeof(test->identity), test->timing_seed) != COBFS4_OK) {
         return (void *) -1;
     }
 
@@ -110,7 +110,6 @@ static void wait_for_data(int fd) {
     epoll_wait(epollfd, &event, 1, -1);
 }
 
-
 intptr_t handshake_test(struct cobfs4_stream *stream) {
     (void)stream;
     return 0;
@@ -120,8 +119,9 @@ intptr_t stream_test(struct cobfs4_stream *stream) {
     //4k bytes
     const size_t buff_size = 1 << 12;
     uint8_t buffer[buff_size];
-    int len = 0;
+    size_t len = 0;
     size_t total = 0;
+    enum cobfs4_return_code rc;
 
     memset(buffer, 'A', sizeof(buffer));
 
@@ -131,29 +131,29 @@ intptr_t stream_test(struct cobfs4_stream *stream) {
      */
     if (stream->type == COBFS4_SERVER) {
         do {
-            len = cobfs4_read(stream, buffer);
-            if (len < 0) {
+            rc = cobfs4_read(stream, buffer, &len);
+            if (rc == COBFS4_ERROR) {
                 return -1;
             }
-            if (len == 0) {
+            if (rc == COBFS4_AGAIN) {
                 wait_for_data(stream->fd);
                 continue;
             }
             total += len;
         } while(total < buff_size);
-        if (cobfs4_write(stream, buffer, buff_size)) {
+        if (cobfs4_write(stream, buffer, buff_size) != COBFS4_OK) {
             return -1;
         }
     } else {
-        if (cobfs4_write(stream, buffer, buff_size)) {
+        if (cobfs4_write(stream, buffer, buff_size) != COBFS4_OK) {
             return -1;
         }
         do {
-            len = cobfs4_read(stream, buffer);
-            if (len < 0) {
+            rc = cobfs4_read(stream, buffer, &len);
+            if (rc == COBFS4_ERROR) {
                 return -1;
             }
-            if (len == 0) {
+            if (rc == COBFS4_AGAIN) {
                 wait_for_data(stream->fd);
                 continue;
             }

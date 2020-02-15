@@ -121,7 +121,6 @@ retry:
         buf += ret;
         goto retry;
     }
-
     return 0;
 }
 
@@ -146,7 +145,7 @@ retry:
     }
 }
 
-static int read_handshake_packet(const struct cobfs4_stream * restrict stream,
+static enum cobfs4_return_code read_handshake_packet(const struct cobfs4_stream * restrict stream,
         uint8_t buf[static restrict COBFS4_MAX_HANDSHAKE_SIZE],
         uint8_t ** restrict out_marker_location) {
     uint8_t shared_buf[COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN];
@@ -156,8 +155,16 @@ static int read_handshake_packet(const struct cobfs4_stream * restrict stream,
     int ret;
     size_t marker_index;
     const size_t min_packet_len = (stream->type == COBFS4_CLIENT) ? COBFS4_CLIENT_HANDSHAKE_LEN : COBFS4_SERVER_HANDSHAKE_LEN;
+    enum cobfs4_return_code rc;
 
-    if (!make_shared_data(&stream->shared, shared_buf)) {
+    if (stream == NULL) {
+        goto error;
+    }
+    if (out_marker_location == NULL) {
+        goto error;
+    }
+
+    if (make_shared_data(&stream->shared, shared_buf) != COBFS4_OK) {
         goto error;
     }
 
@@ -167,8 +174,8 @@ static int read_handshake_packet(const struct cobfs4_stream * restrict stream,
     }
     bytes_read += min_packet_len;
 
-    ret = hmac_gen(shared_buf, sizeof(shared_buf), buf, COBFS4_ELLIGATOR_LEN, marker);
-    if (ret < 0) {
+    rc = hmac_gen(shared_buf, sizeof(shared_buf), buf, COBFS4_ELLIGATOR_LEN, marker);
+    if (rc != COBFS4_OK) {
         goto error;
     }
 
@@ -226,16 +233,15 @@ done:
 
     OPENSSL_cleanse(shared_buf, sizeof(shared_buf));
     OPENSSL_cleanse(marker, sizeof(marker));
-
-    return 0;
+    return COBFS4_OK;
 
 error:
     OPENSSL_cleanse(shared_buf, sizeof(shared_buf));
     OPENSSL_cleanse(marker, sizeof(marker));
-    return -1;
+    return COBFS4_ERROR;
 }
 
-static int write_client_request(int fd, const struct client_request *req) {
+static enum cobfs4_return_code write_client_request(int fd, const struct client_request *req) {
     unsigned char buf[COBFS4_MAX_HANDSHAKE_SIZE];
     int ret;
     size_t client_request_len = 0;
@@ -248,17 +254,17 @@ static int write_client_request(int fd, const struct client_request *req) {
     client_request_len = (COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN + COBFS4_HMAC_LEN);
     //Server expects a minimum of COBFS4_CLIENT_HANDSHAKE_LEN
     if (client_request_len - req->padding_len != COBFS4_CLIENT_HANDSHAKE_LEN) {
-        return -1;
+        return COBFS4_ERROR;
     }
 
     ret = blocking_write(fd, buf, COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN + COBFS4_HMAC_LEN);
     if (ret < 0) {
-        return -1;
+        return COBFS4_ERROR;
     }
-    return 0;
+    return COBFS4_OK;
 }
 
-static int write_server_response(int fd, const struct server_response *resp) {
+static enum cobfs4_return_code write_server_response(int fd, const struct server_response *resp) {
     unsigned char buf[COBFS4_MAX_HANDSHAKE_SIZE];
     int ret;
     size_t server_response_len = 0;
@@ -278,17 +284,17 @@ static int write_server_response(int fd, const struct server_response *resp) {
 
     //Client expects COBFS4_SERVER_HANDSHAKE_LEN as a minimum
     if (server_response_len - resp->padding_len != COBFS4_SERVER_HANDSHAKE_LEN) {
-        return -1;
+        return COBFS4_ERROR;
     }
 
     ret = blocking_write(fd, buf, server_response_len);
     if (ret < 0) {
-        return -1;
+        return COBFS4_ERROR;
     }
-    return 0;
+    return COBFS4_OK;
 }
 
-static int read_server_response(const struct cobfs4_stream * restrict stream,
+static enum cobfs4_return_code read_server_response(const struct cobfs4_stream * restrict stream,
         struct server_response *out_resp) {
     uint8_t buf[COBFS4_MAX_HANDSHAKE_SIZE];
     uint8_t *marker_location;
@@ -296,7 +302,7 @@ static int read_server_response(const struct cobfs4_stream * restrict stream,
 
     memset(buf, 0, sizeof(buf));
 
-    if (read_handshake_packet(stream, buf, &marker_location) == -1) {
+    if (read_handshake_packet(stream, buf, &marker_location) != COBFS4_OK) {
         goto error;
     }
 
@@ -315,14 +321,14 @@ static int read_server_response(const struct cobfs4_stream * restrict stream,
     memcpy(out_resp->response_mac, marker_location + COBFS4_HMAC_LEN, COBFS4_HMAC_LEN);
 
     OPENSSL_cleanse(buf, sizeof(buf));
-    return 0;
+    return COBFS4_OK;
 
 error:
     OPENSSL_cleanse(buf, sizeof(buf));
-    return -1;
+    return COBFS4_ERROR;
 }
 
-static int perform_client_handshake(struct cobfs4_stream *stream) {
+static enum cobfs4_return_code perform_client_handshake(struct cobfs4_stream *stream) {
     struct client_request request;
     struct server_response response;
     uint8_t timing_seed[COBFS4_SERVER_TIMING_SEED_LEN];
@@ -334,19 +340,19 @@ static int perform_client_handshake(struct cobfs4_stream *stream) {
         goto error;
     }
 
-    if (create_client_request(ephem, &stream->shared, &request)) {
+    if (create_client_request(ephem, &stream->shared, &request) != COBFS4_OK) {
         goto error;
     }
 
-    if (write_client_request(stream->fd, &request)) {
+    if (write_client_request(stream->fd, &request) != COBFS4_OK) {
         goto error;
     }
 
-    if (read_server_response(stream, &response)) {
+    if (read_server_response(stream, &response) != COBFS4_OK) {
         goto error;
     }
 
-    if (client_process_server_response(ephem, &stream->shared, &response, timing_seed, &keys)) {
+    if (client_process_server_response(ephem, &stream->shared, &response, timing_seed, &keys) != COBFS4_OK) {
         goto error;
     }
 
@@ -363,7 +369,7 @@ static int perform_client_handshake(struct cobfs4_stream *stream) {
     EVP_PKEY_free(ephem);
     OPENSSL_cleanse(timing_seed, sizeof(timing_seed));
     OPENSSL_cleanse(&keys, sizeof(keys));
-    return 0;
+    return COBFS4_OK;
 
 error:
     if (ephem) {
@@ -371,10 +377,10 @@ error:
     }
     OPENSSL_cleanse(timing_seed, sizeof(timing_seed));
     OPENSSL_cleanse(&keys, sizeof(keys));
-    return -1;
+    return COBFS4_ERROR;
 }
 
-static int read_client_request(const struct cobfs4_stream * restrict stream,
+static enum cobfs4_return_code read_client_request(const struct cobfs4_stream * restrict stream,
         struct client_request *out_req) {
     uint8_t buf[COBFS4_MAX_HANDSHAKE_SIZE];
     uint8_t *marker_location;
@@ -382,7 +388,7 @@ static int read_client_request(const struct cobfs4_stream * restrict stream,
 
     memset(buf, 0, sizeof(buf));
 
-    if (read_handshake_packet(stream, buf, &marker_location) == -1) {
+    if (read_handshake_packet(stream, buf, &marker_location) != COBFS4_OK) {
         goto error;
     }
 
@@ -395,27 +401,27 @@ static int read_client_request(const struct cobfs4_stream * restrict stream,
     memcpy(out_req->request_mac, marker_location + COBFS4_HMAC_LEN, COBFS4_HMAC_LEN);
 
     OPENSSL_cleanse(buf, sizeof(buf));
-    return 0;
+    return COBFS4_OK;
 
 error:
     OPENSSL_cleanse(buf, sizeof(buf));
-    return -1;
+    return COBFS4_ERROR;
 }
 
-static int perform_server_handshake(struct cobfs4_stream *stream) {
+static enum cobfs4_return_code perform_server_handshake(struct cobfs4_stream *stream) {
     struct client_request request;
     struct server_response response;
     struct stretched_key keys;
 
-    if (read_client_request(stream, &request)) {
+    if (read_client_request(stream, &request) != COBFS4_OK) {
         goto error;
     }
 
-    if (create_server_response(&stream->shared, &request, stream->timing_seed, &response, &keys)) {
+    if (create_server_response(&stream->shared, &request, stream->timing_seed, &response, &keys) != COBFS4_OK) {
         goto error;
     }
 
-    if (write_server_response(stream->fd, &response)) {
+    if (write_server_response(stream->fd, &response) != COBFS4_OK) {
         goto error;
     }
 
@@ -430,14 +436,14 @@ static int perform_server_handshake(struct cobfs4_stream *stream) {
     seed_random(&stream->rng, stream->timing_seed);
 
     OPENSSL_cleanse(&keys, sizeof(keys));
-    return 0;
+    return COBFS4_OK;
 
 error:
     OPENSSL_cleanse(&keys, sizeof(keys));
-    return -1;
+    return COBFS4_ERROR;
 }
 
-int cobfs4_client_init(struct cobfs4_stream * restrict stream, int socket,
+enum cobfs4_return_code cobfs4_client_init(struct cobfs4_stream * restrict stream, int socket,
         const uint8_t server_pubkey[static restrict COBFS4_PUBKEY_LEN],
         uint8_t * restrict identity_data, size_t identity_len) {
     memset(stream, 0, sizeof(*stream));
@@ -461,23 +467,23 @@ int cobfs4_client_init(struct cobfs4_stream * restrict stream, int socket,
         goto error;
     }
 
-    if (hash_data(identity_data, identity_len, stream->shared.identity_digest)) {
+    if (hash_data(identity_data, identity_len, stream->shared.identity_digest) != COBFS4_OK) {
         goto error;
     }
 
-    if (perform_client_handshake(stream)) {
+    if (perform_client_handshake(stream) != COBFS4_OK) {
         goto error;
     }
 
     stream->initialized = true;
-    return 0;
+    return COBFS4_OK;
 
 error:
     cobfs4_cleanup(stream);
-    return -1;
+    return COBFS4_ERROR;
 }
 
-int cobfs4_server_init(struct cobfs4_stream * restrict stream, int socket,
+enum cobfs4_return_code cobfs4_server_init(struct cobfs4_stream * restrict stream, int socket,
         const uint8_t private_key[static restrict COBFS4_PRIVKEY_LEN],
         uint8_t * restrict identity_data, size_t identity_len,
         const uint8_t timing_seed[static restrict COBFS4_SERVER_TIMING_SEED_LEN]) {
@@ -502,22 +508,22 @@ int cobfs4_server_init(struct cobfs4_stream * restrict stream, int socket,
         goto error;
     }
 
-    if (hash_data(identity_data, identity_len, stream->shared.identity_digest)) {
+    if (hash_data(identity_data, identity_len, stream->shared.identity_digest) != COBFS4_OK) {
         goto error;
     }
 
     memcpy(stream->timing_seed, timing_seed, COBFS4_SERVER_TIMING_SEED_LEN);
 
-    if (perform_server_handshake(stream)) {
+    if (perform_server_handshake(stream) != COBFS4_OK) {
         goto error;
     }
 
     stream->initialized = true;
-    return 0;
+    return COBFS4_OK;
 
 error:
     cobfs4_cleanup(stream);
-    return -1;
+    return COBFS4_ERROR;
 }
 
 void cobfs4_cleanup(struct cobfs4_stream *stream) {
@@ -532,7 +538,9 @@ void cobfs4_cleanup(struct cobfs4_stream *stream) {
     OPENSSL_cleanse(stream, sizeof(*stream));
 }
 
-int cobfs4_read(struct cobfs4_stream * restrict stream, uint8_t buffer[static restrict COBFS4_MAX_DATA_LEN]) {
+enum cobfs4_return_code cobfs4_read(struct cobfs4_stream * restrict stream,
+        uint8_t buffer[static restrict COBFS4_MAX_DATA_LEN],
+        size_t * restrict out_len) {
     int ret = 0;
     uint16_t len_mask = 0;
     uint16_t frame_len = 0;
@@ -540,6 +548,14 @@ int cobfs4_read(struct cobfs4_stream * restrict stream, uint8_t buffer[static re
     enum frame_type type;
     uint8_t iv[COBFS4_IV_LEN];
     uint64_t tmp_frame_counter;
+    enum cobfs4_return_code rc;
+
+    if (stream == NULL) {
+        goto error;
+    }
+    if (out_len == NULL) {
+        goto error;
+    }
 
     if (!stream->initialized) {
         goto error;
@@ -564,7 +580,7 @@ int cobfs4_read(struct cobfs4_stream * restrict stream, uint8_t buffer[static re
     }
     ++stream->read_frame_counter;
 
-    if (siphash(&stream->read_siphash, &len_mask)) {
+    if (siphash(&stream->read_siphash, &len_mask) != COBFS4_OK) {
         goto error;
     }
 
@@ -593,7 +609,14 @@ int cobfs4_read(struct cobfs4_stream * restrict stream, uint8_t buffer[static re
     memcpy(iv, stream->read_nonce_prefix, COBFS4_NONCE_PREFIX_LEN);
     memcpy(iv + COBFS4_NONCE_PREFIX_LEN, &tmp_frame_counter, sizeof(tmp_frame_counter));
 
-    if (decrypt_frame(stream->read_buffer + COBFS4_FRAME_LEN, frame_len, stream->read_key, iv, buffer, &plaintext_len, &type)) {
+    rc = decrypt_frame(stream->read_buffer + COBFS4_FRAME_LEN,
+            frame_len,
+            stream->read_key,
+            iv,
+            buffer,
+            &plaintext_len,
+            &type);
+    if (rc != COBFS4_OK) {
         goto error;
     }
 
@@ -612,19 +635,20 @@ int cobfs4_read(struct cobfs4_stream * restrict stream, uint8_t buffer[static re
             goto control_packet;
     }
 
-    return plaintext_len;
+    *out_len = plaintext_len;
+    return COBFS4_OK;
 
 control_packet:
     OPENSSL_cleanse(buffer, COBFS4_MAX_DATA_LEN);
-    return cobfs4_read(stream, buffer);
+    return cobfs4_read(stream, buffer, out_len);
 
 error:
     OPENSSL_cleanse(buffer, COBFS4_MAX_DATA_LEN);
     cobfs4_cleanup(stream);
-    return -1;
+    return COBFS4_ERROR;
 }
 
-int cobfs4_write(struct cobfs4_stream *restrict stream, uint8_t * restrict buffer, size_t buf_len) {
+enum cobfs4_return_code cobfs4_write(struct cobfs4_stream *restrict stream, uint8_t * restrict buffer, size_t buf_len) {
     uint16_t frame_len;
     uint16_t len_mask;
     uint64_t rand_output;
@@ -664,11 +688,11 @@ int cobfs4_write(struct cobfs4_stream *restrict stream, uint8_t * restrict buffe
         memcpy(iv + COBFS4_NONCE_PREFIX_LEN, &tmp_frame_counter, sizeof(tmp_frame_counter));
 
         if (make_frame(buffer, data_len, padding_len, TYPE_PAYLOAD,
-                    stream->write_key, iv, stream->write_buffer + COBFS4_FRAME_LEN)) {
+                    stream->write_key, iv, stream->write_buffer + COBFS4_FRAME_LEN) != COBFS4_OK) {
             goto error;
         }
 
-        if (siphash(&stream->write_siphash, &len_mask)) {
+        if (siphash(&stream->write_siphash, &len_mask) != COBFS4_OK) {
             goto error;
         }
 
@@ -687,9 +711,9 @@ int cobfs4_write(struct cobfs4_stream *restrict stream, uint8_t * restrict buffe
         buf_len -= data_len;
     } while (buf_len > 0);
 
-    return 0;
+    return COBFS4_OK;
 
 error:
     cobfs4_cleanup(stream);
-    return -1;
+    return COBFS4_ERROR;
 }

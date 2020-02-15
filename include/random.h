@@ -10,6 +10,6 @@ struct rng_state {
 
 void seed_random(struct rng_state * restrict state, const uint8_t seed[static restrict COBFS4_SECRET_KEY_LEN]);
 
-int deterministic_random(struct rng_state *state, uint8_t *buf, size_t buf_len);
+enum cobfs4_return_code deterministic_random(struct rng_state *state, uint8_t *buf, size_t buf_len);
 
 #endif

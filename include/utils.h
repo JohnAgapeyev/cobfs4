@@ -59,15 +59,15 @@ static inline uint64_t deterministic_rand_interval(struct rng_state *state,
  * Returns a concatenation of the ntor public key and the identity key digest
  * This is used as an HMAC key throughout, so it's useful to have.
  */
-static inline bool make_shared_data(const struct shared_data * restrict shared,
+static inline enum cobfs4_return_code make_shared_data(const struct shared_data * restrict shared,
         uint8_t out_shared_data[static restrict COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN]) {
     size_t tmp_len = COBFS4_PUBKEY_LEN;
     if (!EVP_PKEY_get_raw_public_key(shared->ntor, out_shared_data, &tmp_len)) {
         OPENSSL_cleanse(out_shared_data, COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN);
-        return false;
+        return COBFS4_ERROR;
     }
     memcpy(out_shared_data + COBFS4_PUBKEY_LEN, shared->identity_digest, COBFS4_HASH_LEN);
-    return true;
+    return COBFS4_OK;
 }
 
 static inline void *cobfs4_memmem(const void *haystack, size_t haystack_len,

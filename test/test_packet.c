@@ -34,21 +34,21 @@ void test_handshake(void) {
         shared.ntor = ecdh_key_alloc();
         memcpy(&shared.identity_digest, identity_digest, strlen((char *) identity_digest));
 
-        if (create_client_request(client_key, &shared, &req) == -1) {
+        if (create_client_request(client_key, &shared, &req) != COBFS4_OK) {
             ++bad;
             EVP_PKEY_free(shared.ntor);
             EVP_PKEY_free(client_key);
             continue;
         }
 
-        if (create_server_response(&shared, &req, server_seed, &resp, &server) == -1) {
+        if (create_server_response(&shared, &req, server_seed, &resp, &server) != COBFS4_OK) {
             ++bad;
             EVP_PKEY_free(shared.ntor);
             EVP_PKEY_free(client_key);
             continue;
         }
 
-        if (client_process_server_response(client_key, &shared, &resp, recv_seed, &client) == -1) {
+        if (client_process_server_response(client_key, &shared, &resp, recv_seed, &client) != COBFS4_OK) {
             ++bad;
             EVP_PKEY_free(shared.ntor);
             EVP_PKEY_free(client_key);

@@ -24,11 +24,11 @@ static size_t expand_salt_len = 36;
 static bool validate_client_mac(const struct client_request * restrict req,
         const struct shared_data * restrict shared) {
     uint8_t mac_key[COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN];
-    if (!make_shared_data(shared, mac_key)) {
+    if (make_shared_data(shared, mac_key) != COBFS4_OK) {
         goto error;
     }
 
-    if (hmac_verify(mac_key, sizeof(mac_key), req->elligator, COBFS4_ELLIGATOR_LEN, req->elligator_hmac)) {
+    if (hmac_verify(mac_key, sizeof(mac_key), req->elligator, COBFS4_ELLIGATOR_LEN, req->elligator_hmac) != COBFS4_OK) {
         goto error;
     }
 
@@ -49,21 +49,21 @@ static bool validate_client_mac(const struct client_request * restrict req,
     size_t hmac_data_len = COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN + real_hour_len;
 
     //This is dumb but it works
-    if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac)) {
+    if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac) != COBFS4_OK) {
         if ((real_hour_len = snprintf((char *) packet_hmac_data
                         + COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN, COBFS4_EPOCH_HOUR_LEN,
                         "%lu", hr_time - 1)) < 0) {
             goto error;
         }
         hmac_data_len = COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN + real_hour_len;
-        if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac)) {
+        if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac) != COBFS4_OK) {
             if ((real_hour_len = snprintf((char *) packet_hmac_data
                             + COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN, COBFS4_EPOCH_HOUR_LEN,
                             "%lu", hr_time + 1)) < 0) {
                 goto error;
             }
             hmac_data_len = COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN + real_hour_len;
-            if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac)) {
+            if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac) != COBFS4_OK) {
                 goto error;
             }
         }
@@ -80,11 +80,11 @@ static bool validate_server_mac(const struct server_response * restrict resp,
     uint8_t packet_hmac_data[COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN
         + COBFS4_HMAC_LEN + COBFS4_SERVER_MAX_PAD_LEN + COBFS4_EPOCH_HOUR_LEN];
 
-    if (!make_shared_data(shared, mac_key)) {
+    if (make_shared_data(shared, mac_key) != COBFS4_OK) {
         goto error;
     }
 
-    if (hmac_verify(mac_key, sizeof(mac_key), resp->elligator, COBFS4_ELLIGATOR_LEN, resp->elligator_hmac)) {
+    if (hmac_verify(mac_key, sizeof(mac_key), resp->elligator, COBFS4_ELLIGATOR_LEN, resp->elligator_hmac) != COBFS4_OK) {
         goto error;
     }
 
@@ -107,7 +107,7 @@ static bool validate_server_mac(const struct server_response * restrict resp,
 
     //This technically isn't necessary if I save the previous time string from the initial request, but oh well
     if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data,
-            actual_data_len, resp->response_mac)) {
+            actual_data_len, resp->response_mac) != COBFS4_OK) {
         if ((real_hour_len = snprintf((char *) packet_hmac_data
                         + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN,
                         COBFS4_EPOCH_HOUR_LEN,
@@ -116,7 +116,7 @@ static bool validate_server_mac(const struct server_response * restrict resp,
         }
         size_t actual_data_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN + real_hour_len;
         if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data,
-                actual_data_len, resp->response_mac)) {
+                actual_data_len, resp->response_mac) != COBFS4_OK) {
             if ((real_hour_len = snprintf((char *) packet_hmac_data
                             + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN,
                             COBFS4_EPOCH_HOUR_LEN,
@@ -125,7 +125,7 @@ static bool validate_server_mac(const struct server_response * restrict resp,
             }
             size_t actual_data_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN + real_hour_len;
             if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data,
-                        actual_data_len, resp->response_mac)) {
+                        actual_data_len, resp->response_mac) != COBFS4_OK) {
                 goto error;
             }
         }
@@ -136,10 +136,9 @@ error:
     return false;
 }
 
-int create_client_request(EVP_PKEY * restrict self_keypair,
+enum cobfs4_return_code create_client_request(EVP_PKEY * restrict self_keypair,
         const struct shared_data * restrict shared,
         struct client_request * restrict out_req) {
-
     uint8_t mac_key[COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN];
     uint8_t request_mac_data[COBFS4_ELLIGATOR_LEN + COBFS4_HMAC_LEN
         + COBFS4_EPOCH_HOUR_LEN + COBFS4_CLIENT_MAX_PAD_LEN];
@@ -154,18 +153,18 @@ int create_client_request(EVP_PKEY * restrict self_keypair,
         goto error;
     }
 
-    if (elligator2(self_keypair, out_req->elligator)) {
+    if (elligator2(self_keypair, out_req->elligator) != COBFS4_OK) {
         goto error;
     }
 
     out_req->padding_len = rand_interval(COBFS4_CLIENT_MIN_PAD_LEN, COBFS4_CLIENT_MAX_PAD_LEN);
     RAND_bytes(out_req->random_padding, out_req->padding_len);
 
-    if (!make_shared_data(shared, mac_key)) {
+    if (make_shared_data(shared, mac_key) != COBFS4_OK) {
         goto error;
     }
 
-    if (hmac_gen(mac_key, sizeof(mac_key), out_req->elligator, COBFS4_ELLIGATOR_LEN, out_req->elligator_hmac)) {
+    if (hmac_gen(mac_key, sizeof(mac_key), out_req->elligator, COBFS4_ELLIGATOR_LEN, out_req->elligator_hmac) != COBFS4_OK) {
         goto error;
     }
 
@@ -186,18 +185,17 @@ int create_client_request(EVP_PKEY * restrict self_keypair,
 
     if (hmac_gen(mac_key, sizeof(mac_key), request_mac_data,
                 hmac_data_len,
-                out_req->request_mac)) {
+                out_req->request_mac) != COBFS4_OK) {
         goto error;
     }
-
-    return 0;
+    return COBFS4_OK;
 
 error:
     OPENSSL_cleanse(out_req, sizeof(*out_req));
-    return -1;
+    return COBFS4_ERROR;
 }
 
-int create_server_response(const struct shared_data * restrict shared,
+enum cobfs4_return_code create_server_response(const struct shared_data * restrict shared,
         const struct client_request * restrict incoming_req,
         const uint8_t random_seed[static restrict COBFS4_SERVER_TIMING_SEED_LEN],
         struct server_response * restrict out_resp,
@@ -212,28 +210,28 @@ int create_server_response(const struct shared_data * restrict shared,
     uint8_t epoch_hours[COBFS4_EPOCH_HOUR_LEN + 1];
 
     if (shared == NULL) {
-        return -1;
+        goto error;
     }
     if (incoming_req == NULL) {
-        return -1;
+        goto error;
     }
     if (random_seed == NULL) {
-        return -1;
+        goto error;
     }
     if (out_resp == NULL) {
-        return -1;
+        goto error;
     }
     if (out_keys == NULL) {
-        return -1;
+        goto error;
     }
 
     if (!validate_client_mac(incoming_req, shared)) {
-        return -1;
+        goto error;
     }
 
     ephem_key = ecdh_key_alloc();
     if (!ephem_key) {
-        return -1;
+        goto error;
     }
 
     client_pubkey = elligator2_inv(incoming_req->elligator);
@@ -241,11 +239,11 @@ int create_server_response(const struct shared_data * restrict shared,
         goto error;
     }
 
-    if (server_ntor(ephem_key, client_pubkey, shared, &ntor)) {
+    if (server_ntor(ephem_key, client_pubkey, shared, &ntor) != COBFS4_OK) {
         goto error;
     }
 
-    if (elligator2(ephem_key, out_resp->elligator)) {
+    if (elligator2(ephem_key, out_resp->elligator) != COBFS4_OK) {
         goto error;
     }
 
@@ -253,11 +251,11 @@ int create_server_response(const struct shared_data * restrict shared,
     out_resp->padding_len = rand_interval(COBFS4_SERVER_MIN_PAD_LEN, COBFS4_SERVER_MAX_PAD_LEN);
     RAND_bytes(out_resp->random_padding, out_resp->padding_len);
 
-    if (!make_shared_data(shared, mac_key)) {
+    if (make_shared_data(shared, mac_key) != COBFS4_OK) {
         goto error;
     }
 
-    if (hmac_gen(mac_key, sizeof(mac_key), out_resp->elligator, COBFS4_ELLIGATOR_LEN, out_resp->elligator_hmac)) {
+    if (hmac_gen(mac_key, sizeof(mac_key), out_resp->elligator, COBFS4_ELLIGATOR_LEN, out_resp->elligator_hmac) != COBFS4_OK) {
         goto error;
     }
 
@@ -281,12 +279,12 @@ int create_server_response(const struct shared_data * restrict shared,
     const size_t packet_hmac_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN
         + out_resp->padding_len + COBFS4_HMAC_LEN + COBFS4_EPOCH_HOUR_LEN;
 
-    if (hmac_gen(mac_key, sizeof(mac_key), packet_mac_data, packet_hmac_len, out_resp->response_mac)) {
+    if (hmac_gen(mac_key, sizeof(mac_key), packet_mac_data, packet_hmac_len, out_resp->response_mac) != COBFS4_OK) {
         goto error;
     }
 
     if (hkdf(expand_mesg, expand_mesg_len, expand_salt, expand_salt_len, ntor.key_seed, sizeof(ntor.key_seed),
-                (uint8_t *) out_keys, sizeof(*out_keys))) {
+                (uint8_t *) out_keys, sizeof(*out_keys)) != COBFS4_OK) {
         goto error;
     }
 
@@ -294,7 +292,7 @@ int create_server_response(const struct shared_data * restrict shared,
     memset(seed_iv + sizeof(out_keys->server2client_nonce_prefix), 0,
             COBFS4_IV_LEN - sizeof(out_keys->server2client_nonce_prefix));
     if (make_frame(random_seed, COBFS4_SERVER_TIMING_SEED_LEN, 0, TYPE_PRNG_SEED,
-                out_keys->server2client_key, seed_iv, out_resp->seed_frame)) {
+                out_keys->server2client_key, seed_iv, out_resp->seed_frame) != COBFS4_OK) {
         goto error;
     }
 
@@ -302,18 +300,22 @@ int create_server_response(const struct shared_data * restrict shared,
     EVP_PKEY_free(client_pubkey);
     OPENSSL_cleanse(&ntor, sizeof(ntor));
     OPENSSL_cleanse(seed_iv, sizeof(seed_iv));
-    return 0;
+    return COBFS4_OK;
 
 error:
-    EVP_PKEY_free(ephem_key);
-    EVP_PKEY_free(client_pubkey);
+    if (ephem_key) {
+        EVP_PKEY_free(ephem_key);
+    }
+    if (client_pubkey) {
+        EVP_PKEY_free(client_pubkey);
+    }
     OPENSSL_cleanse(out_resp, sizeof(*out_resp));
     OPENSSL_cleanse(&ntor, sizeof(ntor));
     OPENSSL_cleanse(seed_iv, sizeof(seed_iv));
-    return -1;
+    return COBFS4_ERROR;
 }
 
-int client_process_server_response(EVP_PKEY * restrict self_keypair,
+enum cobfs4_return_code client_process_server_response(EVP_PKEY * restrict self_keypair,
         const struct shared_data * restrict shared,
         struct server_response * restrict resp,
         uint8_t out_server_timing_seed[static restrict COBFS4_SERVER_TIMING_SEED_LEN],
@@ -324,31 +326,31 @@ int client_process_server_response(EVP_PKEY * restrict self_keypair,
     uint16_t plain_len;
 
     if (self_keypair == NULL) {
-        return -1;
+        goto error;
     }
     if (shared == NULL) {
-        return -1;
+        goto error;
     }
     if (resp == NULL) {
-        return -1;
+        goto error;
     }
     if (out_server_timing_seed == NULL) {
-        return -1;
+        goto error;
     }
     if (out_keys == NULL) {
-        return -1;
+        goto error;
     }
 
     if (!validate_server_mac(resp, shared)) {
-        return -1;
+        goto error;
     }
 
     EVP_PKEY *server_pubkey = elligator2_inv(resp->elligator);
     if (server_pubkey == NULL) {
-        return -1;
+        goto error;
     }
 
-    if (client_ntor(self_keypair, server_pubkey, shared, &ntor) == -1) {
+    if (client_ntor(self_keypair, server_pubkey, shared, &ntor) != COBFS4_OK) {
         goto error;
     }
 
@@ -357,7 +359,7 @@ int client_process_server_response(EVP_PKEY * restrict self_keypair,
     }
 
     if (hkdf(expand_mesg, expand_mesg_len, expand_salt, expand_salt_len, ntor.key_seed, sizeof(ntor.key_seed),
-                (uint8_t *) out_keys, sizeof(*out_keys))) {
+                (uint8_t *) out_keys, sizeof(*out_keys)) != COBFS4_OK) {
         goto error;
     }
 
@@ -366,7 +368,7 @@ int client_process_server_response(EVP_PKEY * restrict self_keypair,
             COBFS4_IV_LEN - sizeof(out_keys->server2client_nonce_prefix));
     if (decrypt_frame(resp->seed_frame, COBFS4_INLINE_SEED_FRAME_LEN,
                 out_keys->server2client_key, seed_iv,
-                out_server_timing_seed, &plain_len, &type)) {
+                out_server_timing_seed, &plain_len, &type) != COBFS4_OK) {
         goto error;
     }
 
@@ -379,13 +381,14 @@ int client_process_server_response(EVP_PKEY * restrict self_keypair,
     if (type != TYPE_PRNG_SEED) {
         goto error;
     }
-
     EVP_PKEY_free(server_pubkey);
     OPENSSL_cleanse(&ntor, sizeof(ntor));
-    return 0;
+    return COBFS4_OK;
 
 error:
-    EVP_PKEY_free(server_pubkey);
+    if (server_pubkey) {
+        EVP_PKEY_free(server_pubkey);
+    }
     OPENSSL_cleanse(&ntor, sizeof(ntor));
-    return -1;
+    return COBFS4_ERROR;
 }

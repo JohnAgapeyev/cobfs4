@@ -51,4 +51,10 @@ enum frame_type {
     TYPE_PRNG_SEED = 1,
 };
 
+enum cobfs4_return_code {
+    COBFS4_ERROR = -1,
+    COBFS4_AGAIN = 0,
+    COBFS4_OK = 1,
+};
+
 #endif

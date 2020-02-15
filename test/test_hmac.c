@@ -26,12 +26,12 @@ void test_hmac(void) {
         RAND_bytes(key, key_len);
         RAND_bytes(message, mesg_len);
 
-        if (hmac_gen(key, key_len, message, mesg_len, hmac)) {
+        if (hmac_gen(key, key_len, message, mesg_len, hmac) != COBFS4_OK) {
             ++bad;
             continue;
         }
 
-        if (hmac_verify(key, key_len, message, mesg_len, hmac)) {
+        if (hmac_verify(key, key_len, message, mesg_len, hmac) != COBFS4_OK) {
             ++bad;
         } else {
             ++good;

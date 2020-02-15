@@ -39,17 +39,19 @@ struct cobfs4_stream {
     bool initialized;
 };
 
-int cobfs4_server_init(struct cobfs4_stream * restrict stream, int socket,
+enum cobfs4_return_code cobfs4_server_init(struct cobfs4_stream * restrict stream, int socket,
         const uint8_t private_key[static restrict COBFS4_PRIVKEY_LEN],
         uint8_t * restrict identity_data, size_t identity_len,
         const uint8_t timing_seed[static restrict COBFS4_SERVER_TIMING_SEED_LEN]);
 
-int cobfs4_client_init(struct cobfs4_stream * restrict stream, int socket,
+enum cobfs4_return_code cobfs4_client_init(struct cobfs4_stream * restrict stream, int socket,
         const uint8_t server_pubkey[static restrict COBFS4_PUBKEY_LEN],
         uint8_t * restrict identity_data, size_t identity_len);
 
-int cobfs4_read(struct cobfs4_stream * restrict stream, uint8_t buffer[static restrict COBFS4_MAX_DATA_LEN]);
-int cobfs4_write(struct cobfs4_stream * restrict stream, uint8_t * restrict buffer, size_t buf_len);
+enum cobfs4_return_code cobfs4_read(struct cobfs4_stream * restrict stream,
+        uint8_t buffer[static restrict COBFS4_MAX_DATA_LEN],
+        size_t * restrict out_len);
+enum cobfs4_return_code cobfs4_write(struct cobfs4_stream * restrict stream, uint8_t * restrict buffer, size_t buf_len);
 
 void cobfs4_cleanup(struct cobfs4_stream *stream);
 
