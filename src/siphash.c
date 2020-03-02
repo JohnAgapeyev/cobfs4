@@ -11,7 +11,6 @@ void siphash_init(struct siphash_ctx * restrict ctx, const uint8_t key[static re
 }
 
 enum cobfs4_return_code siphash(struct siphash_ctx * restrict ctx, uint16_t * restrict out_mask) {
-    const EVP_MD *md = EVP_sha512_256();
     uint8_t md_value[EVP_MAX_MD_SIZE];
     size_t md_len = 0;
     EVP_PKEY *pkey = NULL;
@@ -26,7 +25,7 @@ enum cobfs4_return_code siphash(struct siphash_ctx * restrict ctx, uint16_t * re
         goto error;
     }
 
-    if (!EVP_DigestSignInit(mdctx, NULL, md, NULL, pkey)) {
+    if (!EVP_DigestSignInit(mdctx, NULL, NULL, NULL, pkey)) {
         goto error;
     }
 
