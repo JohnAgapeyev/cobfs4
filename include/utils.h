@@ -28,7 +28,9 @@ static inline uint64_t rand_interval(const uint64_t min, const uint64_t max) {
      * the buckets until you land in one of them. All buckets are equally
      * likely. If you land off the end of the line of buckets, try again. */
     do {
-        RAND_bytes((uint8_t *) &r, sizeof(r));
+        if (RAND_bytes((uint8_t *) &r, sizeof(r)) != 1) {
+            return UINT64_MAX;
+        }
     } while (r >= limit);
 
     return min + (r / buckets);

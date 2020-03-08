@@ -158,7 +158,12 @@ enum cobfs4_return_code create_client_request(EVP_PKEY * restrict self_keypair,
     }
 
     out_req->padding_len = rand_interval(COBFS4_CLIENT_MIN_PAD_LEN, COBFS4_CLIENT_MAX_PAD_LEN);
-    RAND_bytes(out_req->random_padding, out_req->padding_len);
+    if (out_req->padding_len > COBFS4_CLIENT_MAX_PAD_LEN) {
+        goto error;
+    }
+    if (RAND_bytes(out_req->random_padding, out_req->padding_len) != 1) {
+        goto error;
+    }
 
     if (make_shared_data(shared, mac_key) != COBFS4_OK) {
         goto error;
@@ -249,7 +254,12 @@ enum cobfs4_return_code create_server_response(const struct shared_data * restri
 
     memcpy(out_resp->auth_tag, &ntor.auth_tag, COBFS4_AUTH_LEN);
     out_resp->padding_len = rand_interval(COBFS4_SERVER_MIN_PAD_LEN, COBFS4_SERVER_MAX_PAD_LEN);
-    RAND_bytes(out_resp->random_padding, out_resp->padding_len);
+    if (out_resp->padding_len > COBFS4_SERVER_MAX_PAD_LEN) {
+        goto error;
+    }
+    if (RAND_bytes(out_resp->random_padding, out_resp->padding_len) != 1) {
+        goto error;
+    }
 
     if (make_shared_data(shared, mac_key) != COBFS4_OK) {
         goto error;

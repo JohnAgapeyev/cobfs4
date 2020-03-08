@@ -129,6 +129,9 @@ retry:
  */
 static inline void random_wait(struct rng_state *rng) {
     const uint64_t choice = deterministic_rand_interval(rng, 0, 100);
+    if (choice > 100) {
+        return;
+    }
     const struct timespec delay = {
         .tv_sec = 0,
         .tv_nsec = 1000 * 100 * choice,
@@ -672,7 +675,7 @@ enum cobfs4_return_code cobfs4_write(struct cobfs4_stream *restrict stream, uint
 
         //This cast should be safe due to the bounds on the random
         rand_output = deterministic_rand_interval(&stream->rng, COBFS4_FRAME_OVERHEAD, COBFS4_MAX_FRAME_LEN);
-        if (rand_output < COBFS4_FRAME_OVERHEAD || rand_output > COBFS4_MAX_FRAME_LEN) {
+        if (rand_output > COBFS4_MAX_FRAME_LEN) {
             goto error;
         }
         desired_len = (uint16_t) rand_output;
