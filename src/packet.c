@@ -22,7 +22,7 @@ static const uint8_t *expand_salt = (uint8_t *) "ntor-curve25519-sha256-1:key_ex
 static size_t expand_salt_len = 36;
 
 static bool validate_client_mac(const struct client_request * restrict req,
-        const struct shared_data * restrict shared) {
+        const struct shared_data * restrict shared, uint64_t *out_hrs) {
     uint8_t mac_key[COBFS4_PUBKEY_LEN + COBFS4_HASH_LEN];
     if (make_shared_data(shared, mac_key) != COBFS4_OK) {
         goto error;
@@ -40,34 +40,40 @@ static bool validate_client_mac(const struct client_request * restrict req,
     memcpy(packet_hmac_data, req->elligator, COBFS4_ELLIGATOR_LEN);
     memcpy(packet_hmac_data + COBFS4_ELLIGATOR_LEN, req->random_padding, req->padding_len);
     memcpy(packet_hmac_data + COBFS4_ELLIGATOR_LEN + req->padding_len, req->elligator_hmac, COBFS4_HMAC_LEN);
+
     if ((real_hour_len = snprintf((char *) packet_hmac_data
                     + COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN, COBFS4_EPOCH_HOUR_LEN,
                     "%lu", hr_time)) < 0) {
         goto error;
     }
 
-    size_t hmac_data_len = COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN + real_hour_len;
+    const size_t hmac_data_len = COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN + real_hour_len;
 
-    //This is dumb but it works
-    if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac) != COBFS4_OK) {
-        if ((real_hour_len = snprintf((char *) packet_hmac_data
-                        + COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN, COBFS4_EPOCH_HOUR_LEN,
-                        "%lu", hr_time - 1)) < 0) {
-            goto error;
-        }
-        hmac_data_len = COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN + real_hour_len;
-        if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac) != COBFS4_OK) {
-            if ((real_hour_len = snprintf((char *) packet_hmac_data
-                            + COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN, COBFS4_EPOCH_HOUR_LEN,
-                            "%lu", hr_time + 1)) < 0) {
-                goto error;
-            }
-            hmac_data_len = COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN + real_hour_len;
-            if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac) != COBFS4_OK) {
-                goto error;
-            }
-        }
+    if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac) == COBFS4_OK) {
+        *out_hrs = hr_time;
+        goto done;
     }
+    if (snprintf((char *) packet_hmac_data
+                + COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN, COBFS4_EPOCH_HOUR_LEN,
+                "%lu", hr_time - 1) < 0) {
+        goto error;
+    }
+    if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac) == COBFS4_OK) {
+        *out_hrs = hr_time - 1;
+        goto done;
+    }
+    if (snprintf((char *) packet_hmac_data
+                + COBFS4_ELLIGATOR_LEN + req->padding_len + COBFS4_HMAC_LEN, COBFS4_EPOCH_HOUR_LEN,
+                "%lu", hr_time + 1) < 0) {
+        goto error;
+    }
+    if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data, hmac_data_len, req->request_mac) == COBFS4_OK) {
+        *out_hrs = hr_time + 1;
+        goto done;
+    }
+    goto error;
+
+done:
     return true;
 error:
     return false;
@@ -93,7 +99,7 @@ static bool validate_server_mac(const struct server_response * restrict resp,
     memcpy(packet_hmac_data + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN, resp->random_padding, resp->padding_len);
     memcpy(packet_hmac_data + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len, resp->elligator_hmac, COBFS4_HMAC_LEN);
 
-    uint64_t hr_time = time(NULL) / 3600;
+    const uint64_t hr_time = time(NULL) / 3600;
     int real_hour_len;
 
     if ((real_hour_len = snprintf((char *) packet_hmac_data
@@ -103,34 +109,35 @@ static bool validate_server_mac(const struct server_response * restrict resp,
         goto error;
     }
 
-    size_t actual_data_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN + real_hour_len;
+    const size_t actual_data_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN + real_hour_len;
 
-    //This technically isn't necessary if I save the previous time string from the initial request, but oh well
     if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data,
-            actual_data_len, resp->response_mac) != COBFS4_OK) {
-        if ((real_hour_len = snprintf((char *) packet_hmac_data
-                        + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN,
-                        COBFS4_EPOCH_HOUR_LEN,
-                        "%lu", hr_time + 1)) < 0) {
-            goto error;
-        }
-        size_t actual_data_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN + real_hour_len;
-        if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data,
-                actual_data_len, resp->response_mac) != COBFS4_OK) {
-            if ((real_hour_len = snprintf((char *) packet_hmac_data
-                            + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN,
-                            COBFS4_EPOCH_HOUR_LEN,
-                            "%lu", hr_time - 1)) < 0) {
-                goto error;
-            }
-            size_t actual_data_len = COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN + real_hour_len;
-            if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data,
-                        actual_data_len, resp->response_mac) != COBFS4_OK) {
-                goto error;
-            }
-        }
+            actual_data_len, resp->response_mac) == COBFS4_OK) {
+        goto done;
     }
+    if (snprintf((char *) packet_hmac_data
+                + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN,
+                COBFS4_EPOCH_HOUR_LEN,
+                "%lu", hr_time - 1) < 0) {
+        goto error;
+    }
+    if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data,
+                actual_data_len, resp->response_mac) == COBFS4_OK) {
+        goto done;
+    }
+    if (snprintf((char *) packet_hmac_data
+                + COBFS4_ELLIGATOR_LEN + COBFS4_AUTH_LEN + resp->padding_len + COBFS4_HMAC_LEN,
+                COBFS4_EPOCH_HOUR_LEN,
+                "%lu", hr_time + 1) < 0) {
+        goto error;
+    }
+    if (hmac_verify(mac_key, sizeof(mac_key), packet_hmac_data,
+                actual_data_len, resp->response_mac) == COBFS4_OK) {
+        goto done;
+    }
+    goto error;
 
+done:
     return true;
 error:
     return false;
@@ -213,6 +220,7 @@ enum cobfs4_return_code create_server_response(const struct shared_data * restri
     struct ntor_output ntor;
     uint8_t seed_iv[COBFS4_IV_LEN];
     uint8_t epoch_hours[COBFS4_EPOCH_HOUR_LEN + 1];
+    uint64_t client_hrs;
 
     if (shared == NULL) {
         goto error;
@@ -230,7 +238,7 @@ enum cobfs4_return_code create_server_response(const struct shared_data * restri
         goto error;
     }
 
-    if (!validate_client_mac(incoming_req, shared)) {
+    if (!validate_client_mac(incoming_req, shared, &client_hrs)) {
         goto error;
     }
 
@@ -269,12 +277,8 @@ enum cobfs4_return_code create_server_response(const struct shared_data * restri
         goto error;
     }
 
-    //Get the number of hours since epoch
-    const uint64_t hr_time = time(NULL) / 3600;
-
-    //TODO: Fix this to properly handle hour disparity like the mac validation does
     int real_hour_len;
-    if ((real_hour_len = snprintf((char *) epoch_hours, COBFS4_EPOCH_HOUR_LEN, "%lu", hr_time)) < 0) {
+    if ((real_hour_len = snprintf((char *) epoch_hours, COBFS4_EPOCH_HOUR_LEN, "%lu", client_hrs)) < 0) {
         goto error;
     }
 
