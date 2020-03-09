@@ -1,6 +1,8 @@
 #ifndef COBFS4_NTOR
 #define COBFS4_NTOR
 
+#include <openssl/evp.h>
+
 #include "constants.h"
 
 struct shared_data {

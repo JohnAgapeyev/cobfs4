@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-#include "elligator.h"
+#include "stream.h"
 
 #if defined(__cplusplus)
 }
