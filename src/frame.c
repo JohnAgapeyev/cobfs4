@@ -79,11 +79,7 @@ enum cobfs4_return_code decrypt_aead(const uint8_t * restrict ciphertext, size_t
         goto error;
     }
 
-    if (!EVP_DecryptInit_ex(ctx, EVP_chacha20_poly1305(), NULL, NULL, NULL)) {
-        goto error;
-    }
-
-    if (!EVP_DecryptInit_ex(ctx, NULL, NULL, key, iv)) {
+    if (!EVP_DecryptInit_ex(ctx, EVP_chacha20_poly1305(), NULL, key, iv)) {
         goto error;
     }
 
