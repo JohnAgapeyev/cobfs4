@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 #include <time.h>
 #include <sys/socket.h>
@@ -29,42 +30,13 @@ char *shared_data = "cobfs4 example shared data";
  * The actual key contents are not sensitive and are arbitrary.
  */
 const char server_privkey[] = {
-    0x98,
-    0xf7,
-    0xf4,
-    0x07,
-    0x12,
-    0xbd,
-    0xc6,
-    0x35,
-    0x5a,
-    0x95,
-    0xd6,
-    0x5d,
-    0x82,
-    0x87,
-    0x3a,
-    0x5a,
-    0xdf,
-    0xc2,
-    0xb9,
-    0x37,
-    0xd8,
-    0xbe,
-    0x00,
-    0x26,
-    0x7b,
-    0xf4,
-    0xe3,
-    0xfe,
-    0x33,
-    0x7b,
-    0x82,
-    0x53
+    0x98, 0xf7, 0xf4, 0x07, 0x12, 0xbd, 0xc6, 0x35, 0x5a, 0x95, 0xd6, 0x5d, 0x82, 0x87, 0x3a, 0x5a,
+    0xdf, 0xc2, 0xb9, 0x37, 0xd8, 0xbe, 0x00, 0x26, 0x7b, 0xf4, 0xe3, 0xfe, 0x33, 0x7b, 0x82, 0x53
 };
 
 int main(int argc, char **argv) {
     size_t len;
+    ssize_t size;
     enum cobfs4_return_code rc;
     struct cobfs4_stream stream = {0};
     int client_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -74,7 +46,7 @@ int main(int argc, char **argv) {
     unsigned char pubkey[COBFS4_PUBKEY_LEN];
     EVP_PKEY_get_raw_public_key(server_keypair, pubkey, &(size_t){COBFS4_PUBKEY_LEN});
 
-    unsigned char buffer[COBFS4_MAX_DATA_LEN];
+    unsigned char buffer[4096];
     memset(buffer, 0, sizeof(buffer));
 
     struct sockaddr_in servaddr;
@@ -92,17 +64,28 @@ int main(int argc, char **argv) {
         goto error;
     }
 
-    if (cobfs4_write(&stream, buffer, sizeof(buffer)) != COBFS4_OK) {
-        goto error;
-    }
+    for (;;) {
+        size = read(STDIN_FILENO, buffer, sizeof(buffer));
+        if (size == -1) {
+            goto error;
+        }
 
-    rc = cobfs4_read(&stream, buffer, &len);
-    if (rc == COBFS4_ERROR) {
-        goto error;
-    }
+        if (cobfs4_write(&stream, buffer, size) != COBFS4_OK) {
+            goto error;
+        }
 
+retry:
+        rc = cobfs4_read(&stream, buffer, &len);
+        if (rc == COBFS4_ERROR) {
+            goto error;
+        }
+        if (rc == COBFS4_AGAIN) {
+            goto retry;
+        }
+        write(STDOUT_FILENO, buffer, len);
+        fsync(STDOUT_FILENO);
+    }
     cobfs4_cleanup(&stream);
-
     return EXIT_SUCCESS;
 
 error:

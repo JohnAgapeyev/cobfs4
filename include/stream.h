@@ -42,7 +42,7 @@ struct cobfs4_stream {
 enum cobfs4_return_code cobfs4_server_init(struct cobfs4_stream * restrict stream, int socket,
         const uint8_t private_key[static restrict COBFS4_PRIVKEY_LEN],
         uint8_t * restrict identity_data, size_t identity_len,
-        const uint8_t timing_seed[static restrict COBFS4_SERVER_TIMING_SEED_LEN]);
+        uint8_t * restrict timing_seed, size_t timing_seed_len);
 
 enum cobfs4_return_code cobfs4_client_init(struct cobfs4_stream * restrict stream, int socket,
         const uint8_t server_pubkey[static restrict COBFS4_PUBKEY_LEN],

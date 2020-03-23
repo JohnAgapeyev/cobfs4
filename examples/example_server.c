@@ -29,38 +29,8 @@ char *shared_data = "cobfs4 example shared data";
  * The actual key contents are not sensitive and are arbitrary.
  */
 const char server_privkey[] = {
-    0x98,
-    0xf7,
-    0xf4,
-    0x07,
-    0x12,
-    0xbd,
-    0xc6,
-    0x35,
-    0x5a,
-    0x95,
-    0xd6,
-    0x5d,
-    0x82,
-    0x87,
-    0x3a,
-    0x5a,
-    0xdf,
-    0xc2,
-    0xb9,
-    0x37,
-    0xd8,
-    0xbe,
-    0x00,
-    0x26,
-    0x7b,
-    0xf4,
-    0xe3,
-    0xfe,
-    0x33,
-    0x7b,
-    0x82,
-    0x53
+    0x98, 0xf7, 0xf4, 0x07, 0x12, 0xbd, 0xc6, 0x35, 0x5a, 0x95, 0xd6, 0x5d, 0x82, 0x87, 0x3a, 0x5a,
+    0xdf, 0xc2, 0xb9, 0x37, 0xd8, 0xbe, 0x00, 0x26, 0x7b, 0xf4, 0xe3, 0xfe, 0x33, 0x7b, 0x82, 0x53
 };
 
 int main(int argc, char **argv) {
@@ -72,7 +42,7 @@ int main(int argc, char **argv) {
     unsigned char timing_seed[32];
     memset(timing_seed, 0, sizeof(timing_seed));
 
-    unsigned char buffer[COBFS4_MAX_DATA_LEN];
+    unsigned char buffer[4096];
     memset(buffer, 0, sizeof(buffer));
 
     struct sockaddr_in servaddr;
@@ -89,17 +59,23 @@ int main(int argc, char **argv) {
 
     if (cobfs4_server_init(&stream, server_socket,
                 server_privkey, shared_data,
-                strlen(shared_data), timing_seed) != COBFS4_OK) {
+                strlen(shared_data), timing_seed, sizeof(timing_seed)) != COBFS4_OK) {
         goto error;
     }
 
-    if (cobfs4_write(&stream, buffer, sizeof(buffer)) != COBFS4_OK) {
-        goto error;
-    }
+    for (;;) {
+retry:
+        rc = cobfs4_read(&stream, buffer, &len);
+        if (rc == COBFS4_ERROR) {
+            goto error;
+        }
+        if (rc == COBFS4_AGAIN) {
+            goto retry;
+        }
 
-    rc = cobfs4_read(&stream, buffer, &len);
-    if (rc == COBFS4_ERROR) {
-        goto error;
+        if (cobfs4_write(&stream, buffer, len) != COBFS4_OK) {
+            goto error;
+        }
     }
 
     cobfs4_cleanup(&stream);

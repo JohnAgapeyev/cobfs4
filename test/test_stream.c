@@ -86,7 +86,7 @@ void *server_thread_routine(void *ctx) {
 
     if (cobfs4_server_init(test->stream, server_socket,
                 test->server_priv, test->identity,
-                sizeof(test->identity), test->timing_seed) != COBFS4_OK) {
+                sizeof(test->identity), test->timing_seed, sizeof(test->timing_seed)) != COBFS4_OK) {
         return (void *) -1;
     }
 

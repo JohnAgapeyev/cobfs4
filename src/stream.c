@@ -21,7 +21,7 @@
 #include "frame.h"
 
 static const struct timeval timeout = {
-    .tv_sec = 1,
+    .tv_sec = 3600,
     .tv_usec = 0,
 };
 
@@ -453,10 +453,12 @@ enum cobfs4_return_code cobfs4_client_init(struct cobfs4_stream * restrict strea
     stream->fd = socket;
     stream->type = COBFS4_CLIENT;
 
+    if (setsockopt(socket, SOL_SOCKET, SO_KEEPALIVE, &(int){1}, sizeof(int)) < 0) {
+        goto error;
+    }
     if (setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
         goto error;
     }
-
     if (setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
         goto error;
     }
@@ -489,15 +491,17 @@ error:
 enum cobfs4_return_code cobfs4_server_init(struct cobfs4_stream * restrict stream, int socket,
         const uint8_t private_key[static restrict COBFS4_PRIVKEY_LEN],
         uint8_t * restrict identity_data, size_t identity_len,
-        const uint8_t timing_seed[static restrict COBFS4_SERVER_TIMING_SEED_LEN]) {
+        uint8_t * restrict timing_seed, size_t timing_seed_len) {
     memset(stream, 0, sizeof(*stream));
     stream->fd = socket;
     stream->type = COBFS4_SERVER;
 
+    if (setsockopt(socket, SOL_SOCKET, SO_KEEPALIVE, &(int){1}, sizeof(int)) < 0) {
+        goto error;
+    }
     if (setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
         goto error;
     }
-
     if (setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
         goto error;
     }
@@ -515,7 +519,9 @@ enum cobfs4_return_code cobfs4_server_init(struct cobfs4_stream * restrict strea
         goto error;
     }
 
-    memcpy(stream->timing_seed, timing_seed, COBFS4_SERVER_TIMING_SEED_LEN);
+    if (hash_data(timing_seed, timing_seed_len, stream->timing_seed) != COBFS4_OK) {
+        goto error;
+    }
 
     if (perform_server_handshake(stream) != COBFS4_OK) {
         goto error;
@@ -673,7 +679,6 @@ enum cobfs4_return_code cobfs4_write(struct cobfs4_stream *restrict stream, uint
         }
         ++stream->write_frame_counter;
 
-        //This cast should be safe due to the bounds on the random
         rand_output = deterministic_rand_interval(&stream->rng, COBFS4_FRAME_OVERHEAD, COBFS4_MAX_FRAME_LEN);
         if (rand_output > COBFS4_MAX_FRAME_LEN) {
             goto error;
