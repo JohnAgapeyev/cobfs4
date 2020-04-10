@@ -3,6 +3,7 @@
 #include <openssl/evp.h>
 #include <openssl/bn.h>
 #include <openssl/err.h>
+#include <openssl/rand.h>
 
 #include "cobfs4.h"
 #include "elligator.h"
@@ -209,6 +210,23 @@ void test_elligator(void) {
         }
         EVP_PKEY_free(res_pubkey_obj);
     }
+
+    good = 0;
+    bad = 0;
+
+    for (count = 0; count < TEST_CASE_COUNT; ++count) {
+        RAND_bytes(elligator, sizeof(elligator));
+        res_pubkey_obj = elligator2_inv(elligator);
+        if (res_pubkey_obj) {
+            ++good;
+            EVP_PKEY_free(res_pubkey_obj);
+            continue;
+        } else {
+            ++bad;
+            continue;
+        }
+    }
+    printf("Elligator inverse only test ran %d times\nResults:\nGood: %d\nBad: %d\n", count, good, bad);
 
     good = 0;
     bad = 0;
