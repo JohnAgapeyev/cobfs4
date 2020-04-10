@@ -56,6 +56,14 @@ set(INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+set(DIEHARDER_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/test/test_dieharder.c
+)
+
+set(TESTU01_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/test/test_u01.c
+)
+
 include(CheckIPOSupported)
 check_ipo_supported(RESULT ipo_supported OUTPUT error)
 
@@ -88,3 +96,21 @@ target_compile_definitions(${PROJECT_NAME}_test PRIVATE "$<$<CONFIG:RELEASE>:NDE
 target_include_directories(${PROJECT_NAME}_test PRIVATE ${INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME}_test PRIVATE OpenSSL::Crypto Threads::Threads ${PROJECT_NAME})
 target_link_options(${PROJECT_NAME}_test PRIVATE "$<$<CONFIG:RELEASE>:-s>")
+
+add_executable(${PROJECT_NAME}_dieharder ${DIEHARDER_SOURCES})
+target_compile_options(${PROJECT_NAME}_dieharder
+    PRIVATE ${WARNINGS}
+    PUBLIC "$<$<CONFIG:DEBUG>:${DEBUG_OPTIONS}>" "$<$<CONFIG:RELEASE>:${RELEASE_OPTIONS}>")
+target_compile_definitions(${PROJECT_NAME}_dieharder PRIVATE "$<$<CONFIG:RELEASE>:NDEBUG>")
+target_include_directories(${PROJECT_NAME}_dieharder PRIVATE ${INCLUDE_DIRS})
+target_link_libraries(${PROJECT_NAME}_dieharder PRIVATE OpenSSL::Crypto ${PROJECT_NAME})
+target_link_options(${PROJECT_NAME}_dieharder PRIVATE "$<$<CONFIG:RELEASE>:-s>")
+
+add_executable(${PROJECT_NAME}_u01 ${TESTU01_SOURCES})
+target_compile_options(${PROJECT_NAME}_u01
+    PRIVATE ${WARNINGS}
+    PUBLIC "$<$<CONFIG:DEBUG>:${DEBUG_OPTIONS}>" "$<$<CONFIG:RELEASE>:${RELEASE_OPTIONS}>")
+target_compile_definitions(${PROJECT_NAME}_u01 PRIVATE "$<$<CONFIG:RELEASE>:NDEBUG>")
+target_include_directories(${PROJECT_NAME}_u01 PRIVATE ${INCLUDE_DIRS})
+target_link_libraries(${PROJECT_NAME}_u01 PRIVATE OpenSSL::Crypto ${PROJECT_NAME} -ltestu01)
+target_link_options(${PROJECT_NAME}_u01 PRIVATE "$<$<CONFIG:RELEASE>:-s>")

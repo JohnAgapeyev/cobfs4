@@ -191,6 +191,25 @@ void test_elligator(void) {
 
     printf("Elligator test ran %d times\nResults:\nGood: %d\nBad: %d\nInvalid: %d\n", count, good, bad, invalid);
 
+    memset(elligator, 0, sizeof(elligator));
+    res_pubkey_obj = elligator2_inv(elligator);
+    if (res_pubkey_obj) {
+        EVP_PKEY_get_raw_public_key(res_pubkey_obj, res_pubkey, &key_len);
+
+        int res = 0;
+        for (int i = 0; i < 32; ++i) {
+            if (elligator[i] != 0x00) {
+                printf("All zero elligator input Bad!\n");
+                res = 1;
+                break;
+            }
+        }
+        if (res == 0) {
+            printf("All zero elligator input Good!\n");
+        }
+        EVP_PKEY_free(res_pubkey_obj);
+    }
+
     good = 0;
     bad = 0;
 #else
