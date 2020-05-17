@@ -6,9 +6,28 @@
 #include <openssl/err.h>
 #include "elligator.h"
 
+/*
+ * This file contains an implementation of Elligator2 using OpenSSL Bignums.
+ * It is known to be suboptimal in terms of performance and memory usage.
+ * Formulas used are the reference from the paper, rather than optimized versions specific to Curve25519.
+ * OpenSSL Bignums are also far too generic for this use case.
+ * Elligator validity for key generation is also far too expensive in that it performs the full map and inverse
+ * rather than just doing a simple formula evaluation.
+ * At the time of writing, I lack the expertise to write a custom efficient field arithmetic version of this.
+ *
+ * In terms of security, there may also be a potential issue inherent to Elligator where the resulting public key
+ * from the forward map is always on the prime order subgroup, which isn't the case with random strings.
+ * I cannot sufficiently judge whether this is a valid concern, and no countermeasures have been implemented to combat this.
+ * For more information see:
+ * http://loup-vaillant.fr/articles/implementing-elligator
+ * http://loup-vaillant.fr/tutorials/cofactor
+ *
+ * I am not a professional cryptographer, use at your own risk.
+ */
+
 static const char *X25519_PRIME = "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffed";
 
-enum cobfs4_return_code elligator2(const EVP_PKEY * restrict pkey, uint8_t out_elligator[static restrict COBFS4_ELLIGATOR_LEN]) {
+enum cobfs4_return_code elligator2_inv(const EVP_PKEY * restrict pkey, uint8_t out_elligator[static restrict COBFS4_ELLIGATOR_LEN]) {
     BIGNUM *r;
     BIGNUM *x;
     BIGNUM *y;
@@ -304,8 +323,7 @@ enum cobfs4_return_code elligator2(const EVP_PKEY * restrict pkey, uint8_t out_e
         }
     }
 
-    memset(skey, 0, skeylen);
-    if (!BN_bn2bin(r, skey + (skeylen - BN_num_bytes(r)))) {
+    if (!BN_bn2binpad(r, skey, skeylen)) {
         goto error;
     }
 
@@ -346,7 +364,7 @@ free_pkey_ctx:
     return COBFS4_ERROR;
 }
 
-EVP_PKEY *elligator2_inv(const uint8_t buffer[static restrict COBFS4_ELLIGATOR_LEN]) {
+EVP_PKEY *elligator2(const uint8_t buffer[static restrict COBFS4_ELLIGATOR_LEN]) {
     BIGNUM *r;
     BIGNUM *v;
     BIGNUM *e;
@@ -669,11 +687,11 @@ bool elligator_valid(const EVP_PKEY * restrict pkey) {
     uint8_t elligator[COBFS4_ELLIGATOR_LEN];
     EVP_PKEY *res = NULL;
 
-    if (elligator2(pkey, elligator) != COBFS4_OK) {
+    if (elligator2_inv(pkey, elligator) != COBFS4_OK) {
         return false;
     }
 
-    res = elligator2_inv(elligator);
+    res = elligator2(elligator);
     if (res == NULL) {
         return false;
     }

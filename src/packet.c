@@ -160,7 +160,7 @@ enum cobfs4_return_code create_client_request(EVP_PKEY * restrict self_keypair,
         goto error;
     }
 
-    if (elligator2(self_keypair, out_req->elligator) != COBFS4_OK) {
+    if (elligator2_inv(self_keypair, out_req->elligator) != COBFS4_OK) {
         goto error;
     }
 
@@ -247,7 +247,7 @@ enum cobfs4_return_code create_server_response(const struct shared_data * restri
         goto error;
     }
 
-    client_pubkey = elligator2_inv(incoming_req->elligator);
+    client_pubkey = elligator2(incoming_req->elligator);
     if (!client_pubkey) {
         goto error;
     }
@@ -256,7 +256,7 @@ enum cobfs4_return_code create_server_response(const struct shared_data * restri
         goto error;
     }
 
-    if (elligator2(ephem_key, out_resp->elligator) != COBFS4_OK) {
+    if (elligator2_inv(ephem_key, out_resp->elligator) != COBFS4_OK) {
         goto error;
     }
 
@@ -359,7 +359,7 @@ enum cobfs4_return_code client_process_server_response(EVP_PKEY * restrict self_
         goto error;
     }
 
-    EVP_PKEY *server_pubkey = elligator2_inv(resp->elligator);
+    EVP_PKEY *server_pubkey = elligator2(resp->elligator);
     if (server_pubkey == NULL) {
         goto error;
     }

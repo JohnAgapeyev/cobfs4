@@ -29,7 +29,7 @@ unsigned int elligator_random(void) {
     if (bytes_used == 0) {
 #if 0
         EVP_PKEY *key = ecdh_key_alloc();
-        elligator2(key, elligator);
+        elligator2_inv(key, elligator);
         EVP_PKEY_free(key);
 #else
         EVP_PKEY_CTX *pctx = NULL;
@@ -39,7 +39,7 @@ retry:
         key = EVP_PKEY_new();
         EVP_PKEY_keygen_init(pctx);
         EVP_PKEY_keygen(pctx, &key);
-        if (elligator2(key, elligator) != COBFS4_OK) {
+        if (elligator2_inv(key, elligator) != COBFS4_OK) {
             EVP_PKEY_free(key);
             EVP_PKEY_CTX_free(pctx);
             goto retry;
