@@ -36,7 +36,8 @@ struct cobfs4_stream {
     uint64_t read_frame_counter;
     uint64_t write_frame_counter;
 
-    bool initialized;
+    unsigned char initialized : 1;
+    unsigned char nonblocking_read : 1;
 };
 
 enum cobfs4_return_code cobfs4_server_init(struct cobfs4_stream * restrict stream, int socket,

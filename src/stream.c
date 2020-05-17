@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #include <openssl/evp.h>
 
@@ -463,6 +464,12 @@ enum cobfs4_return_code cobfs4_client_init(struct cobfs4_stream * restrict strea
         goto error;
     }
 
+    const int flags = fcntl(socket, F_GETFL, 0);
+    if (flags == -1) {
+        goto error;
+    }
+    stream->nonblocking_read = ((flags & O_NONBLOCK) != 0);
+
     stream->shared.ntor = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519, NULL, server_pubkey, COBFS4_PUBKEY_LEN);
     if (stream->shared.ntor == NULL) {
         goto error;
@@ -480,7 +487,7 @@ enum cobfs4_return_code cobfs4_client_init(struct cobfs4_stream * restrict strea
         goto error;
     }
 
-    stream->initialized = true;
+    stream->initialized = 1;
     return COBFS4_OK;
 
 error:
@@ -506,6 +513,12 @@ enum cobfs4_return_code cobfs4_server_init(struct cobfs4_stream * restrict strea
         goto error;
     }
 
+    const int flags = fcntl(socket, F_GETFL, 0);
+    if (flags == -1) {
+        goto error;
+    }
+    stream->nonblocking_read = ((flags & O_NONBLOCK) != 0);
+
     stream->shared.ntor = EVP_PKEY_new_raw_private_key(EVP_PKEY_X25519, NULL, private_key, COBFS4_PRIVKEY_LEN);
     if (stream->shared.ntor == NULL) {
         goto error;
@@ -527,7 +540,7 @@ enum cobfs4_return_code cobfs4_server_init(struct cobfs4_stream * restrict strea
         goto error;
     }
 
-    stream->initialized = true;
+    stream->initialized = 1;
     return COBFS4_OK;
 
 error:
@@ -570,15 +583,21 @@ enum cobfs4_return_code cobfs4_read(struct cobfs4_stream * restrict stream,
         goto error;
     }
 
-    ret = nonblocking_read(stream->fd, stream->read_buffer, sizeof(uint16_t));
-    if (ret == -1) {
-        goto error;
-    } else if (ret == 0) {
-        //EAGAIN, tell the caller to wait until read event
-        return 0;
-    } else if (ret == 1) {
-        //We somehow read 1 byte from a 2 byte read, so block until we get the other byte
-        if (blocking_read(stream->fd, stream->read_buffer + 1, 1) != 1) {
+    if (stream->nonblocking_read) {
+        ret = nonblocking_read(stream->fd, stream->read_buffer, sizeof(uint16_t));
+        if (ret == -1) {
+            goto error;
+        } else if (ret == 0) {
+            //EAGAIN, tell the caller to wait until read event
+            return COBFS4_AGAIN;
+        } else if (ret == 1) {
+            //We somehow read 1 byte from a 2 byte read, so block until we get the other byte
+            if (blocking_read(stream->fd, stream->read_buffer + 1, 1) != 1) {
+                goto error;
+            }
+        }
+    } else {
+        if (blocking_read(stream->fd, stream->read_buffer, sizeof(uint16_t)) != sizeof(uint16_t)) {
             goto error;
         }
     }

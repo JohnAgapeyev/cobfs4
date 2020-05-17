@@ -34,10 +34,49 @@ const char server_privkey[] = {
     0xdf, 0xc2, 0xb9, 0x37, 0xd8, 0xbe, 0x00, 0x26, 0x7b, 0xf4, 0xe3, 0xfe, 0x33, 0x7b, 0x82, 0x53
 };
 
-int main(int argc, char **argv) {
-    size_t len;
+void *file_read(void *data) {
+    struct cobfs4_stream *stream = data;
     ssize_t size;
+    unsigned char buffer[4096];
+    memset(buffer, 0, sizeof(buffer));
+
+    for (;;) {
+        size = read(STDIN_FILENO, buffer, sizeof(buffer));
+        if (size == -1) {
+            break;
+        } else if (size == 0) {
+            break;
+        }
+
+        if (cobfs4_write(stream, buffer, size) != COBFS4_OK) {
+            break;
+        }
+    }
+    return NULL;
+}
+
+void *network_read(void *data) {
+    struct cobfs4_stream *stream = data;
     enum cobfs4_return_code rc;
+    size_t len;
+    unsigned char buffer[4096];
+    memset(buffer, 0, sizeof(buffer));
+
+    for (;;) {
+        rc = cobfs4_read(stream, buffer, &len);
+        if (rc == COBFS4_ERROR) {
+            break;
+        }
+        if (rc == COBFS4_AGAIN) {
+            continue;
+        }
+        write(STDOUT_FILENO, buffer, len);
+        fsync(STDOUT_FILENO);
+    }
+    return NULL;
+}
+
+int main(int argc, char **argv) {
     struct cobfs4_stream stream = {0};
     int client_socket = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -45,9 +84,6 @@ int main(int argc, char **argv) {
 
     unsigned char pubkey[COBFS4_PUBKEY_LEN];
     EVP_PKEY_get_raw_public_key(server_keypair, pubkey, &(size_t){COBFS4_PUBKEY_LEN});
-
-    unsigned char buffer[4096];
-    memset(buffer, 0, sizeof(buffer));
 
     struct sockaddr_in servaddr;
     servaddr.sin_family = AF_INET;
@@ -61,34 +97,21 @@ int main(int argc, char **argv) {
     if (cobfs4_client_init(&stream, client_socket,
                 pubkey, shared_data,
                 strlen(shared_data)) != COBFS4_OK) {
-        goto error;
+        close(client_socket);
+        EVP_PKEY_free(server_keypair);
+        return EXIT_FAILURE;
     }
 
-    for (;;) {
-        size = read(STDIN_FILENO, buffer, sizeof(buffer));
-        if (size == -1) {
-            goto error;
-        }
+    pthread_t file_thread;
+    pthread_t network_thread;
 
-        if (cobfs4_write(&stream, buffer, size) != COBFS4_OK) {
-            goto error;
-        }
+    pthread_create(&file_thread, NULL, file_read, &stream);
+    pthread_create(&network_thread, NULL, network_read, &stream);
 
-retry:
-        rc = cobfs4_read(&stream, buffer, &len);
-        if (rc == COBFS4_ERROR) {
-            goto error;
-        }
-        if (rc == COBFS4_AGAIN) {
-            goto retry;
-        }
-        write(STDOUT_FILENO, buffer, len);
-        fsync(STDOUT_FILENO);
-    }
+    pthread_join(file_thread, NULL);
+    pthread_join(network_thread, NULL);
+
     cobfs4_cleanup(&stream);
+    EVP_PKEY_free(server_keypair);
     return EXIT_SUCCESS;
-
-error:
-    cobfs4_cleanup(&stream);
-    return EXIT_FAILURE;
 }
