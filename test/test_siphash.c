@@ -2,6 +2,7 @@
 
 #include <string.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "cobfs4.h"
 #include "test.h"

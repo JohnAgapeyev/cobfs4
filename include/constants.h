@@ -3,14 +3,18 @@
 
 #include <stdint.h>
 
+#include "cobfs4.h"
+
 #define COBFS4_SECRET_KEY_LEN (32)
 #define COBFS4_TAG_LEN (16)
 #define COBFS4_IV_LEN (12)
 #define COBFS4_NONCE_PREFIX_LEN (COBFS4_IV_LEN - sizeof(uint64_t))
 #define COBFS4_BLOCK_LEN (16) //Only used for deterministic RNG
 
-#define COBFS4_PUBKEY_LEN (32)
-#define COBFS4_PRIVKEY_LEN (32)
+//Defined in public header
+//#define COBFS4_PUBKEY_LEN (32)
+//Defined in public header
+//#define COBFS4_PRIVKEY_LEN (32)
 #define COBFS4_ELLIGATOR_LEN (32)
 
 #define COBFS4_HMAC_LEN (32)
@@ -42,19 +46,21 @@
 #define COBFS4_FRAME_PAYLOAD_OVERHEAD (COBFS4_TAG_LEN + 3)
 #define COBFS4_FRAME_OVERHEAD (COBFS4_FRAME_PAYLOAD_OVERHEAD + COBFS4_FRAME_LEN)
 #define COBFS4_MAX_FRAME_PAYLOAD_LEN (COBFS4_MAX_FRAME_LEN - COBFS4_FRAME_LEN)
-#define COBFS4_MAX_DATA_LEN (COBFS4_MAX_FRAME_PAYLOAD_LEN - COBFS4_FRAME_PAYLOAD_OVERHEAD)
+//Defined in public header
+//#define COBFS4_MAX_DATA_LEN (COBFS4_MAX_FRAME_PAYLOAD_LEN - COBFS4_FRAME_PAYLOAD_OVERHEAD)
 
 #define COBFS4_INLINE_SEED_FRAME_LEN (COBFS4_SERVER_TIMING_SEED_LEN + COBFS4_FRAME_PAYLOAD_OVERHEAD)
 
-enum frame_type {
-    TYPE_PAYLOAD = 0,
-    TYPE_PRNG_SEED = 1,
-};
-
-enum cobfs4_return_code {
-    COBFS4_ERROR = -1,
-    COBFS4_AGAIN = 0,
-    COBFS4_OK = 1,
-};
+//Defined in public header
+//enum frame_type {
+//    TYPE_PAYLOAD = 0,
+//    TYPE_PRNG_SEED = 1,
+//};
+//
+//enum cobfs4_return_code {
+//    COBFS4_ERROR = -1,
+//    COBFS4_AGAIN = 0,
+//    COBFS4_OK = 1,
+//};
 
 #endif

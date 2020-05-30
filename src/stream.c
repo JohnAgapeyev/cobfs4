@@ -744,3 +744,7 @@ error:
     cobfs4_cleanup(stream);
     return COBFS4_ERROR;
 }
+
+size_t cobfs4_stream_size(void) {
+    return sizeof(struct cobfs4_stream);
+}

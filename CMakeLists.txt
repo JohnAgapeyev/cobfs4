@@ -8,6 +8,8 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 endif()
 
+set(COBFS4_DEBUG_TARGETS OFF)
+
 set(CMAKE_C_FLAGS_DEBUG "")
 set(CMAKE_C_FLAGS_RELEASE "")
 set(CMAKE_C_FLAGS_RELWITHDEBINFO "")
@@ -78,7 +80,7 @@ find_package(OpenSSL 1.1.1 REQUIRED)
 
 find_package(Threads REQUIRED)
 
-add_library(${PROJECT_NAME} STATIC ${LIBRARY_SOURCES})
+add_library(${PROJECT_NAME} SHARED ${LIBRARY_SOURCES})
 
 target_compile_options(${PROJECT_NAME}
     PRIVATE ${WARNINGS}
@@ -87,30 +89,37 @@ target_compile_definitions(${PROJECT_NAME} PUBLIC "$<$<CONFIG:RELEASE>:NDEBUG>")
 target_include_directories(${PROJECT_NAME} PUBLIC ${INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} PRIVATE OpenSSL::Crypto)
 target_link_options(${PROJECT_NAME} PRIVATE "$<$<CONFIG:RELEASE>:-s>")
+set_target_properties(${PROJECT_NAME} PROPERTIES PUBLIC_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/include/cobfs4.h)
 
-add_executable(${PROJECT_NAME}_test ${TEST_SOURCES})
-target_compile_options(${PROJECT_NAME}_test
-    PRIVATE ${WARNINGS}
-    PUBLIC "$<$<CONFIG:DEBUG>:${DEBUG_OPTIONS}>" "$<$<CONFIG:RELEASE>:${RELEASE_OPTIONS}>")
-target_compile_definitions(${PROJECT_NAME}_test PRIVATE "$<$<CONFIG:RELEASE>:NDEBUG>")
-target_include_directories(${PROJECT_NAME}_test PRIVATE ${INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME}_test PRIVATE OpenSSL::Crypto Threads::Threads ${PROJECT_NAME})
-target_link_options(${PROJECT_NAME}_test PRIVATE "$<$<CONFIG:RELEASE>:-s>")
+install(TARGETS ${PROJECT_NAME}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-add_executable(${PROJECT_NAME}_dieharder ${DIEHARDER_SOURCES})
-target_compile_options(${PROJECT_NAME}_dieharder
-    PRIVATE ${WARNINGS}
-    PUBLIC "$<$<CONFIG:DEBUG>:${DEBUG_OPTIONS}>" "$<$<CONFIG:RELEASE>:${RELEASE_OPTIONS}>")
-target_compile_definitions(${PROJECT_NAME}_dieharder PRIVATE "$<$<CONFIG:RELEASE>:NDEBUG>")
-target_include_directories(${PROJECT_NAME}_dieharder PRIVATE ${INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME}_dieharder PRIVATE OpenSSL::Crypto ${PROJECT_NAME})
-target_link_options(${PROJECT_NAME}_dieharder PRIVATE "$<$<CONFIG:RELEASE>:-s>")
+IF(COBFS4_DEBUG_TARGETS MATCHES ON)
+    add_executable(${PROJECT_NAME}_test ${TEST_SOURCES})
+    target_compile_options(${PROJECT_NAME}_test
+        PRIVATE ${WARNINGS}
+        PUBLIC "$<$<CONFIG:DEBUG>:${DEBUG_OPTIONS}>" "$<$<CONFIG:RELEASE>:${RELEASE_OPTIONS}>")
+    target_compile_definitions(${PROJECT_NAME}_test PRIVATE "$<$<CONFIG:RELEASE>:NDEBUG>")
+    target_include_directories(${PROJECT_NAME}_test PRIVATE ${INCLUDE_DIRS})
+    target_link_libraries(${PROJECT_NAME}_test PRIVATE OpenSSL::Crypto Threads::Threads ${PROJECT_NAME})
+    target_link_options(${PROJECT_NAME}_test PRIVATE "$<$<CONFIG:RELEASE>:-s>")
 
-add_executable(${PROJECT_NAME}_u01 ${TESTU01_SOURCES})
-target_compile_options(${PROJECT_NAME}_u01
-    PRIVATE ${WARNINGS}
-    PUBLIC "$<$<CONFIG:DEBUG>:${DEBUG_OPTIONS}>" "$<$<CONFIG:RELEASE>:${RELEASE_OPTIONS}>")
-target_compile_definitions(${PROJECT_NAME}_u01 PRIVATE "$<$<CONFIG:RELEASE>:NDEBUG>")
-target_include_directories(${PROJECT_NAME}_u01 PRIVATE ${INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME}_u01 PRIVATE OpenSSL::Crypto ${PROJECT_NAME} -ltestu01)
-target_link_options(${PROJECT_NAME}_u01 PRIVATE "$<$<CONFIG:RELEASE>:-s>")
+    add_executable(${PROJECT_NAME}_dieharder ${DIEHARDER_SOURCES})
+    target_compile_options(${PROJECT_NAME}_dieharder
+        PRIVATE ${WARNINGS}
+        PUBLIC "$<$<CONFIG:DEBUG>:${DEBUG_OPTIONS}>" "$<$<CONFIG:RELEASE>:${RELEASE_OPTIONS}>")
+    target_compile_definitions(${PROJECT_NAME}_dieharder PRIVATE "$<$<CONFIG:RELEASE>:NDEBUG>")
+    target_include_directories(${PROJECT_NAME}_dieharder PRIVATE ${INCLUDE_DIRS})
+    target_link_libraries(${PROJECT_NAME}_dieharder PRIVATE OpenSSL::Crypto ${PROJECT_NAME})
+    target_link_options(${PROJECT_NAME}_dieharder PRIVATE "$<$<CONFIG:RELEASE>:-s>")
+
+    add_executable(${PROJECT_NAME}_u01 ${TESTU01_SOURCES})
+    target_compile_options(${PROJECT_NAME}_u01
+        PRIVATE ${WARNINGS}
+        PUBLIC "$<$<CONFIG:DEBUG>:${DEBUG_OPTIONS}>" "$<$<CONFIG:RELEASE>:${RELEASE_OPTIONS}>")
+    target_compile_definitions(${PROJECT_NAME}_u01 PRIVATE "$<$<CONFIG:RELEASE>:NDEBUG>")
+    target_include_directories(${PROJECT_NAME}_u01 PRIVATE ${INCLUDE_DIRS})
+    target_link_libraries(${PROJECT_NAME}_u01 PRIVATE OpenSSL::Crypto ${PROJECT_NAME} -ltestu01)
+    target_link_options(${PROJECT_NAME}_u01 PRIVATE "$<$<CONFIG:RELEASE>:-s>")
+ENDIF(COBFS4_DEBUG_TARGETS MATCHES ON)

@@ -1,6 +1,7 @@
 #include <openssl/rand.h>
 
 #include <string.h>
+#include <stdio.h>
 
 #include "cobfs4.h"
 #include "test.h"

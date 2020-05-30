@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdlib.h>
 #include <time.h>
 #include <sys/socket.h>
 #include <sys/epoll.h>
@@ -36,7 +37,7 @@ const char server_privkey[] = {
 int main(int argc, char **argv) {
     size_t len;
     enum cobfs4_return_code rc;
-    struct cobfs4_stream stream = {0};
+    struct cobfs4_stream *stream = malloc(cobfs4_stream_size());
     int listen_socket = socket(AF_INET, SOCK_STREAM, 0);
 
     unsigned char timing_seed[32];
@@ -57,7 +58,7 @@ int main(int argc, char **argv) {
 
     int server_socket = accept(listen_socket, NULL, NULL);
 
-    if (cobfs4_server_init(&stream, server_socket,
+    if (cobfs4_server_init(stream, server_socket,
                 server_privkey, shared_data,
                 strlen(shared_data), timing_seed, sizeof(timing_seed)) != COBFS4_OK) {
         goto error;
@@ -65,7 +66,7 @@ int main(int argc, char **argv) {
 
     for (;;) {
 retry:
-        rc = cobfs4_read(&stream, buffer, &len);
+        rc = cobfs4_read(stream, buffer, &len);
         if (rc == COBFS4_ERROR) {
             goto error;
         }
@@ -73,18 +74,19 @@ retry:
             goto retry;
         }
 
-        if (cobfs4_write(&stream, buffer, len) != COBFS4_OK) {
+        if (cobfs4_write(stream, buffer, len) != COBFS4_OK) {
             goto error;
         }
     }
 
-    cobfs4_cleanup(&stream);
+    cobfs4_cleanup(stream);
     close(listen_socket);
-
+    free(stream);
     return EXIT_SUCCESS;
 
 error:
-    cobfs4_cleanup(&stream);
+    cobfs4_cleanup(stream);
     close(listen_socket);
+    free(stream);
     return EXIT_FAILURE;
 }

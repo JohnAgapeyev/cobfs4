@@ -1,4 +1,6 @@
+#include <openssl/evp.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <sys/socket.h>
@@ -77,7 +79,7 @@ void *network_read(void *data) {
 }
 
 int main(int argc, char **argv) {
-    struct cobfs4_stream stream = {0};
+    struct cobfs4_stream *stream = malloc(cobfs4_stream_size());
     int client_socket = socket(AF_INET, SOCK_STREAM, 0);
 
     EVP_PKEY *server_keypair = EVP_PKEY_new_raw_private_key(EVP_PKEY_X25519, NULL, server_privkey, COBFS4_PRIVKEY_LEN);
@@ -94,7 +96,7 @@ int main(int argc, char **argv) {
 
     connect(client_socket, (struct sockaddr *)&servaddr, sizeof(servaddr));
 
-    if (cobfs4_client_init(&stream, client_socket,
+    if (cobfs4_client_init(stream, client_socket,
                 pubkey, shared_data,
                 strlen(shared_data)) != COBFS4_OK) {
         close(client_socket);
@@ -105,13 +107,16 @@ int main(int argc, char **argv) {
     pthread_t file_thread;
     pthread_t network_thread;
 
-    pthread_create(&file_thread, NULL, file_read, &stream);
-    pthread_create(&network_thread, NULL, network_read, &stream);
+    pthread_create(&file_thread, NULL, file_read, stream);
+    pthread_create(&network_thread, NULL, network_read, stream);
 
     pthread_join(file_thread, NULL);
     pthread_join(network_thread, NULL);
 
-    cobfs4_cleanup(&stream);
+    cobfs4_cleanup(stream);
     EVP_PKEY_free(server_keypair);
+
+    free(stream);
+
     return EXIT_SUCCESS;
 }
