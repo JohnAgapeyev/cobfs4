@@ -12,20 +12,10 @@ extern "C" {
 #define COBFS4_PRIVKEY_LEN (32)
 #define COBFS4_MAX_DATA_LEN (1427)
 
-enum frame_type {
-    TYPE_PAYLOAD = 0,
-    TYPE_PRNG_SEED = 1,
-};
-
 enum cobfs4_return_code {
     COBFS4_ERROR = -1,
     COBFS4_AGAIN = 0,
     COBFS4_OK = 1,
-};
-
-enum connection_type {
-    COBFS4_CLIENT,
-    COBFS4_SERVER,
 };
 
 struct cobfs4_stream;

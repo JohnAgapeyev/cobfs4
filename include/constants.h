@@ -51,12 +51,11 @@
 
 #define COBFS4_INLINE_SEED_FRAME_LEN (COBFS4_SERVER_TIMING_SEED_LEN + COBFS4_FRAME_PAYLOAD_OVERHEAD)
 
-//Defined in public header
-//enum frame_type {
-//    TYPE_PAYLOAD = 0,
-//    TYPE_PRNG_SEED = 1,
-//};
-//
+enum frame_type {
+    TYPE_PAYLOAD = 0,
+    TYPE_PRNG_SEED = 1,
+};
+
 //enum cobfs4_return_code {
 //    COBFS4_ERROR = -1,
 //    COBFS4_AGAIN = 0,

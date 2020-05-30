@@ -10,6 +10,11 @@
 #include "random.h"
 #include "ntor.h"
 
+enum connection_type {
+    COBFS4_CLIENT,
+    COBFS4_SERVER,
+};
+
 struct cobfs4_stream {
     int fd;
     enum connection_type type;

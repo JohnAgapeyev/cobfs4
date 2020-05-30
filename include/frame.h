@@ -2,6 +2,7 @@
 #define COBFS4_FRAME_H
 
 #include <stdint.h>
+#include "cobfs4.h"
 #include "constants.h"
 
 enum cobfs4_return_code encrypt_aead(const uint8_t * restrict plaintext, size_t plain_len,

@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "cobfs4.h"
 #include "constants.h"
 #include "frame.h"
 
