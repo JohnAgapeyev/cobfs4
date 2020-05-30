@@ -25,11 +25,6 @@ unsigned int elligator_random(void) {
     static size_t bytes_used = 0;
 
     if (bytes_used == 0) {
-#if 0
-        EVP_PKEY *key = ecdh_key_alloc();
-        elligator2_inv(key, elligator);
-        EVP_PKEY_free(key);
-#else
         EVP_PKEY_CTX *pctx = NULL;
         EVP_PKEY *key = NULL;
 retry:
@@ -44,7 +39,6 @@ retry:
         }
         EVP_PKEY_free(key);
         EVP_PKEY_CTX_free(pctx);
-#endif
     }
     memcpy(&x, elligator + bytes_used, sizeof(x));
     bytes_used += sizeof(unsigned int);
@@ -54,19 +48,24 @@ retry:
     return x;
 }
 
-int main(void) {
+int main(int argc, char **argv) {
     unsigned int x;
+    if (argc != 2) {
+        return EXIT_FAILURE;
+    }
+    if (argv[1][0] == 'r') {
+        RAND_bytes((unsigned char *) &seed, sizeof(seed));
+        seed_random(&state, seed);
 
-    RAND_bytes((unsigned char *) &seed, sizeof(seed));
-    seed_random(&state, seed);
-
-    for (;;) {
-#if 1
-        x = seeded_random();
-#else
-        x = elligator_random();
-#endif
-        fwrite(&x, sizeof(x), 1, stdout);
+        for (;;) {
+            x = seeded_random();
+            fwrite(&x, sizeof(x), 1, stdout);
+        }
+    } else {
+        for (;;) {
+            x = elligator_random();
+            fwrite(&x, sizeof(x), 1, stdout);
+        }
     }
 
     return 0;

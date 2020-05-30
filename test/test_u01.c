@@ -27,11 +27,6 @@ unsigned int elligator_random(void) {
     static size_t bytes_used = 0;
 
     if (bytes_used == 0) {
-#if 0
-        EVP_PKEY *key = ecdh_key_alloc();
-        elligator2_inv(key, elligator);
-        EVP_PKEY_free(key);
-#else
         EVP_PKEY_CTX *pctx = NULL;
         EVP_PKEY *key = NULL;
 retry:
@@ -46,7 +41,6 @@ retry:
         }
         EVP_PKEY_free(key);
         EVP_PKEY_CTX_free(pctx);
-#endif
     }
     memcpy(&x, elligator + bytes_used, sizeof(x));
     bytes_used += sizeof(unsigned int);
@@ -56,19 +50,24 @@ retry:
     return x;
 }
 
-int main(void) {
-    RAND_bytes((unsigned char *) &seed, sizeof(seed));
-    seed_random(&state, seed);
+int main(int argc, char **argv) {
+    if (argc != 2) {
+        return EXIT_FAILURE;
+    }
+    if (argv[1][0] == 'r') {
+        RAND_bytes((unsigned char *) &seed, sizeof(seed));
+        seed_random(&state, seed);
 
-    unif01_Gen *rand_gen = unif01_CreateExternGenBits((char *) "Fast Key Erasure ChaCha20", seeded_random);
-    bbattery_SmallCrush(rand_gen);
-    //bbattery_BigCrush(rand_gen);
-    unif01_DeleteExternGenBits(rand_gen);
+        unif01_Gen *rand_gen = unif01_CreateExternGenBits((char *) "Fast Key Erasure ChaCha20", seeded_random);
+        //bbattery_SmallCrush(rand_gen);
+        bbattery_BigCrush(rand_gen);
+        unif01_DeleteExternGenBits(rand_gen);
+    } else {
+        unif01_Gen *elligator_gen = unif01_CreateExternGenBits((char *) "Elligator mapping output", elligator_random);
+        //bbattery_SmallCrush(elligator_gen);
+        bbattery_BigCrush(elligator_gen);
+        unif01_DeleteExternGenBits(elligator_gen);
+    }
 
-    unif01_Gen *elligator_gen = unif01_CreateExternGenBits((char *) "Elligator mapping output", elligator_random);
-    //bbattery_SmallCrush(elligator_gen);
-    //bbattery_BigCrush(elligator_gen);
-    unif01_DeleteExternGenBits(elligator_gen);
-
-    return 0;
+    return EXIT_SUCCESS;
 }
