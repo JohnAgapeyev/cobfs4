@@ -84,10 +84,8 @@ For stream initialization, an existing connected TCP socket is required.
 When used this way for initialization, the ownership of the socket passes to cobfs4.
 The user of the library MUST NOT close or modify this socket after this point.
 
-Read and write calls support both blocking and nonblocking execution.
-The choice is determined by reading the O_NONBLOCK flag on the socket during initialization.
-
 Reads may be blocking or nonblocking, and the COBFS4_AGAIN error code is returned to signal that EAGAIN was received by the library.
+The decision whether reads are blocking or not is determined by reading the O_NONBLOCK flag on the socket during initialization.
 An application may use existing techniques for handling nonblocking sockets, such as epoll, with the socket passed in during initialization.
 Reads are also limited to returning up to COBFS4_MAX_DATA_LEN bytes per read call.
 The out_len parameter will contain the actual length of the data read.
@@ -104,3 +102,22 @@ Nevertheless, it also does not involve any shared global state.
 In general, using the struct cobsf4_stream in multiple threads requires synchronization on the part of the caller.
 One exception however is that due to a separation of states, reading and writing may occur simultaneously, so long as only one reader and writer is active.
 The library is not fork-safe, and a stream cannot be used in multiple processesor.
+
+## Throughput
+Due to the "paranoid" nature of use in the protocol polymorphism, throughput is severely limited.
+According to the Scramblesuit spec, which is referenced in Obfs4 for the protocol polymorphism, the following ranges are used:
+
+> For the packet length distribution, all values SHOULD be in {21..1448}.
+> For the inter-arrival time distribution, all values SHOULD be in the interval [0, 0.01].
+
+This means that ideal throughput is 1448 byte packets sent with zero delay, but that is statistically unlikely, so it will not be considered.
+Since we follow the "paranoid" mode of execution, unlike the ScrambleSuit tendency to maximize MTU sized packets, we will fall somewhere in that range.
+
+Assuming median values in both ranges, that equates to a 735 byte packet being sent every 5ms.
+This results in a throughput of 147KBps.
+
+A worst case scenario involves a 21 byte packet sent every 10ms.
+This results in a throughput of 2.1KBps.
+
+Therefore, the throughput of this library is intentionally very slow to maximize randomness in the packet flow metadata.
+This must be taken into consideration when using this library, as it is significantly lower than most end users would expect from a networking library.
